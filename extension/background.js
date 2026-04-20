@@ -463,7 +463,30 @@ async function getActiveTab() {
   return tab || null;
 }
 
+function isRestrictedBrowserUrl(url) {
+  const value = String(url || '').toLowerCase();
+  return (
+    value.startsWith('chrome://') ||
+    value.startsWith('chrome-extension://') ||
+    value.startsWith('edge://') ||
+    value.startsWith('about:') ||
+    value.startsWith('devtools://')
+  );
+}
+
+function unsupportedPageMessage(url) {
+  if (String(url || '').toLowerCase().startsWith('chrome://')) {
+    return 'Hermes Relay cannot inspect browser-internal Chrome pages like chrome:// URLs.';
+  }
+  return 'Hermes Relay can only work with normal web pages, not browser-internal tabs.';
+}
+
 async function extractPageContext(tabId) {
+  const tab = await chrome.tabs.get(tabId);
+  if (isRestrictedBrowserUrl(tab?.url || '')) {
+    throw new Error(unsupportedPageMessage(tab.url));
+  }
+
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId },
     func: () => {
@@ -1157,6 +1180,9 @@ async function injectIntoActiveTab(text) {
   if (!tab?.id) {
     throw new Error('No active tab available.');
   }
+  if (isRestrictedBrowserUrl(tab?.url || '')) {
+    throw new Error('Hermes Relay cannot insert context into browser-internal pages like chrome:// tabs.');
+  }
 
   try {
     const reply = await chrome.tabs.sendMessage(tab.id, {
@@ -1406,7 +1432,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ ok: false, error: 'No active tab available.' });
         return;
       }
-      const page = await extractPageContext(tab.id);
+      let page = null;
+      try {
+        page = await extractPageContext(tab.id);
+      } catch (error) {
+        sendResponse({ ok: false, error: error.message || 'Hermes could not inspect the active tab.' });
+        return;
+      }
       const note = await getPageNote(page.url);
       const continuity = await summarizePageContinuity(page, tab);
       sendResponse({ ok: true, page, tab, note, continuity });

@@ -6,6 +6,16 @@ function setOutput(text) {
   $('output').textContent = text || 'No output yet.';
 }
 
+function setPageActionAvailability(enabled) {
+  ['summarize-page', 'ask-page', 'inject-context'].forEach((id) => {
+    const button = $(id);
+    if (button) {
+      button.disabled = !enabled;
+    }
+  });
+  $('ask-prompt').disabled = !enabled;
+}
+
 function setBusy(buttonId, label, busy) {
   const button = $(buttonId);
   if (!button) return;
@@ -51,14 +61,16 @@ function renderStatus(payload) {
 
 function renderPage(response) {
   if (!response?.ok) {
+    setPageActionAvailability(false);
     $('page-title').textContent = 'No active page found';
-    $('page-meta').textContent = 'Open a normal browser tab to use Hermes Relay.';
+    $('page-meta').textContent = 'Open a normal website tab to use Hermes Relay.';
     $('page-continuity').textContent = response?.error || 'Hermes could not inspect the active tab.';
     $('page-continuity').classList.remove('seen');
     $('page-continuity').classList.add('new');
     return;
   }
 
+  setPageActionAvailability(true);
   const { page, tab, continuity } = response;
   $('page-title').textContent = page?.title || tab?.title || 'Untitled page';
   $('page-meta').textContent = [page?.hostname, page?.pageType, page?.url].filter(Boolean).join(' · ');

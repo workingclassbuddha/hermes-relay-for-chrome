@@ -13,6 +13,33 @@ let trackedPinnedOnly = false;
 let currentDirectThread = null;
 let currentWorkspaceUrl = '';
 
+function setWorkspaceDisabled(disabled) {
+  [
+    'track-page',
+    'save-snapshot',
+    'compare-snapshot',
+    'refresh-direct',
+    'clear-direct',
+    'direct-prompt',
+    'send-direct',
+    'page-note',
+    'save-note',
+    'workspace-prompt',
+    'workspace-target',
+    'run-workflow',
+    'inject-workflow',
+  ].forEach((id) => {
+    const element = $(id);
+    if (element) {
+      element.disabled = disabled;
+    }
+  });
+
+  document.querySelectorAll('.workflow-btn, .memory-btn').forEach((button) => {
+    button.disabled = disabled;
+  });
+}
+
 function relativeTime(iso) {
   const delta = Date.now() - new Date(iso).getTime();
   const mins = Math.round(delta / 60000);
@@ -115,6 +142,7 @@ function renderDirectThread(thread) {
 }
 
 function renderPage(page, tab, note, continuity) {
+  setWorkspaceDisabled(false);
   currentPage = page;
   currentNote = note?.text || '';
   currentContinuity = continuity || null;
@@ -127,6 +155,26 @@ function renderPage(page, tab, note, continuity) {
     ? headings.slice(0, 6).map((heading) => `<span class="tag">${escapeHtml(heading)}</span>`).join('')
     : '<span class="tag">No headings found</span>';
   renderContinuity(continuity);
+}
+
+function renderUnavailablePage(message) {
+  setWorkspaceDisabled(true);
+  currentPage = null;
+  currentNote = '';
+  currentContinuity = null;
+  currentDirectThread = null;
+  currentWorkspaceUrl = '';
+  $('page-title').textContent = 'This page is unavailable to Hermes Relay';
+  $('page-meta').textContent = 'Switch to a normal website tab to use the workspace.';
+  $('page-continuity').classList.remove('seen');
+  $('page-continuity').classList.add('new');
+  $('page-continuity').textContent = message || 'Hermes Relay could not inspect the active tab.';
+  $('page-memory-stats').innerHTML = '<span class="tag">Browser-internal page</span>';
+  $('page-headings').innerHTML = '<span class="tag">No page context available</span>';
+  $('page-note').value = '';
+  $('track-page').textContent = 'Track Page';
+  $('direct-thread').innerHTML = '<div class="history-empty">Open a normal web page to use the Hermes direct line.</div>';
+  $('snapshot-list').innerHTML = '<div class="history-empty">Snapshots are only available for normal web pages.</div>';
 }
 
 function escapeHtml(text) {
@@ -252,7 +300,7 @@ async function refreshPage() {
   const previousWorkspaceUrl = currentWorkspaceUrl;
   const response = await sendMessage({ type: 'GET_ACTIVE_PAGE_CONTEXT' });
   if (!response.ok) {
-    setOutput(response.error || 'Could not read the active page.');
+    renderUnavailablePage(response.error || 'Could not read the active page.');
     return;
   }
   renderPage(response.page, response.tab, response.note, response.continuity);
