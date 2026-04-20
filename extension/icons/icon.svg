@@ -1,0 +1,19 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="128" height="128" rx="28" fill="#0A101A"/>
+  <rect x="10" y="10" width="108" height="108" rx="24" fill="url(#paint0_linear)" stroke="#2D405D" stroke-width="2"/>
+  <path d="M64 22L95 47V81L64 106L33 81V47L64 22Z" fill="#101A2A" stroke="#7AD7FF" stroke-width="4"/>
+  <path d="M64 35V91" stroke="#EAF6FF" stroke-width="6" stroke-linecap="round"/>
+  <path d="M44 52H84" stroke="#7AD7FF" stroke-width="6" stroke-linecap="round"/>
+  <path d="M49 73H79" stroke="#7AD7FF" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="64" cy="64" r="48" stroke="url(#paint1_linear)" stroke-opacity="0.35" stroke-width="2"/>
+  <defs>
+    <linearGradient id="paint0_linear" x1="64" y1="10" x2="64" y2="118" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#15213A"/>
+      <stop offset="1" stop-color="#0D1320"/>
+    </linearGradient>
+    <linearGradient id="paint1_linear" x1="26" y1="22" x2="96" y2="108" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7AD7FF"/>
+      <stop offset="1" stop-color="#42B5FF"/>
+    </linearGradient>
+  </defs>
+</svg>

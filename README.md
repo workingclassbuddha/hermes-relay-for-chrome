@@ -74,11 +74,11 @@ Official references:
 1. Open `chrome://extensions`
 2. Enable Developer mode
 3. Click **Load unpacked**
-4. Select [extension](</Users/mespoy/Desktop/Thegolemv4 fully working  /hermes-relay/extension>)
+4. Select `hermes-relay/extension`
 
 ## Validate The Project
 
-From [hermes-relay](</Users/mespoy/Desktop/Thegolemv4 fully working  /hermes-relay>):
+From `hermes-relay/`:
 
 ```bash
 npm run check
@@ -91,6 +91,19 @@ That validates:
 - `extension/content/chat.js`
 - `extension/popup/popup.js`
 - `extension/sidepanel/sidepanel.js`
+
+## Package For Chrome
+
+Build an uploadable Chrome zip from `hermes-relay/`:
+
+```bash
+npm run package:chrome
+```
+
+That will:
+
+- generate release icons in `extension/icons/`
+- create `dist/hermes-relay-chrome.zip`
 
 ## Keyboard Shortcuts
 

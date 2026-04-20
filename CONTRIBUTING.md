@@ -4,7 +4,7 @@ Thanks for helping with Hermes Relay.
 
 ## Development Flow
 
-1. Load the extension from [extension](</Users/mespoy/Desktop/Thegolemv4 fully working  /hermes-relay/extension>).
+1. Load the extension from `extension/`.
 2. Make changes in the unpacked extension files.
 3. Reload Hermes Relay in `chrome://extensions`.
 4. Run:
