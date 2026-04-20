@@ -1,0 +1,66 @@
+{
+  "manifest_version": 3,
+  "name": "Hermes Relay",
+  "version": "0.1.0",
+  "description": "A browser-native relay for Hermes Agent: capture pages, ask Hermes about what you are viewing, and inject context into AI chats.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "tabs",
+    "contextMenus",
+    "sidePanel"
+  ],
+  "commands": {
+    "capture-page": {
+      "suggested_key": {
+        "default": "Alt+Shift+H"
+      },
+      "description": "Capture the current page with Hermes"
+    },
+    "build-context": {
+      "suggested_key": {
+        "default": "Alt+Shift+C"
+      },
+      "description": "Build Hermes context for the current page"
+    },
+    "inject-context": {
+      "suggested_key": {
+        "default": "Alt+Shift+I"
+      },
+      "description": "Inject the latest Hermes context into the active chat"
+    }
+  },
+  "host_permissions": [
+    "http://127.0.0.1:8642/*",
+    "http://localhost:8642/*",
+    "https://claude.ai/*",
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://gemini.google.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Hermes Relay",
+    "default_popup": "popup/popup.html"
+  },
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://gemini.google.com/*"
+      ],
+      "js": [
+        "content/chat.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

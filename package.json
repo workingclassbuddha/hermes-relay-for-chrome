@@ -1,0 +1,11 @@
+{
+  "name": "hermes-relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone Chrome extension for Hermes Agent: page capture, watchlists, memory actions, and AI context handoff.",
+  "scripts": {
+    "check:manifest": "node -e \"JSON.parse(require('fs').readFileSync('extension/manifest.json', 'utf8')); console.log('manifest ok')\"",
+    "check:js": "node --check extension/background.js && node --check extension/content/chat.js && node --check extension/popup/popup.js && node --check extension/sidepanel/sidepanel.js",
+    "check": "npm run check:manifest && npm run check:js"
+  }
+}

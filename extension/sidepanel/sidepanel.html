@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Hermes Workspace</title>
+    <link rel="stylesheet" href="sidepanel.css">
+  </head>
+  <body>
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">Hermes Workspace</div>
+          <h1>Current page</h1>
+        </div>
+        <button id="refresh-page" class="icon-btn" title="Refresh page context">↻</button>
+      </header>
+
+      <section class="panel page-panel">
+        <div id="page-title" class="page-title">Loading page context…</div>
+        <div id="page-meta" class="page-meta">Looking at the active tab</div>
+        <div id="page-headings" class="tag-list"></div>
+        <div class="page-actions">
+          <button id="track-page" class="secondary-btn">Track Page</button>
+          <button id="save-snapshot" class="secondary-btn">Save Snapshot</button>
+          <button id="compare-snapshot" class="secondary-btn">Compare To Last</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <div class="section-title">Page Notes</div>
+          <button id="save-note" class="secondary-btn">Save Note</button>
+        </div>
+        <textarea id="page-note" rows="5" placeholder="Keep a running note for this page."></textarea>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">Workflows</div>
+        <div class="workflow-grid">
+          <button class="workflow-btn active" data-mode="ask">Ask</button>
+          <button class="workflow-btn" data-mode="summarize">Summarize</button>
+          <button class="workflow-btn" data-mode="next-steps">Next Steps</button>
+          <button class="workflow-btn" data-mode="draft-reply">Draft Reply</button>
+          <button class="workflow-btn" data-mode="extract-tasks">Tasks</button>
+          <button class="workflow-btn" data-mode="research">Research</button>
+          <button class="workflow-btn" data-mode="compare">Compare</button>
+          <button class="workflow-btn" data-mode="capture">Capture</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">Prompt</div>
+        <textarea id="workspace-prompt" rows="5" placeholder="Tell Hermes what you want from this page."></textarea>
+        <div class="toolbar">
+          <div class="target-wrap">
+            <span>Target</span>
+            <select id="workspace-target">
+              <option value="auto">Auto</option>
+              <option value="claude">Claude</option>
+              <option value="chatgpt">ChatGPT</option>
+              <option value="gemini">Gemini</option>
+              <option value="generic">Generic</option>
+            </select>
+          </div>
+          <div class="toolbar-actions">
+            <button id="run-workflow" class="primary-btn">Run</button>
+            <button id="inject-workflow" class="secondary-btn">Inject</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <div class="section-title">Output</div>
+          <div class="toolbar-actions">
+            <button id="copy-workspace-output" class="secondary-btn">Copy</button>
+            <button id="open-workspace-output" class="secondary-btn">Open</button>
+          </div>
+        </div>
+        <pre id="workspace-output" class="workspace-output">Hermes output will appear here.</pre>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">Memory</div>
+        <div class="memory-grid">
+          <button class="memory-btn" data-kind="fact">Remember Fact</button>
+          <button class="memory-btn" data-kind="preference">Remember Preference</button>
+          <button class="memory-btn" data-kind="workflow">Remember Workflow</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <div class="section-title">Snapshots</div>
+        </div>
+        <div id="snapshot-list" class="snapshot-list">
+          <div class="history-empty">No snapshots for this page yet.</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <div class="section-title">Tracked Pages</div>
+          <button id="tracked-filter-toggle" class="secondary-btn">Pinned Only: Off</button>
+        </div>
+        <input id="tracked-search" class="tracked-search" type="text" placeholder="Filter tracked pages">
+        <div id="tracked-pages" class="tracked-list">
+          <div class="history-empty">No tracked pages yet.</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <div class="section-title">History</div>
+        </div>
+        <div id="workspace-history" class="history-list">
+          <div class="history-empty">No workspace runs yet.</div>
+        </div>
+      </section>
+    </main>
+    <script src="sidepanel.js"></script>
+  </body>
+  </html>

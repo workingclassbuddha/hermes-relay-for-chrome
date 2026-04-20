@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Hermes Relay</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="app">
+      <header class="hero">
+        <div class="mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none">
+            <path d="M24 6l13 11v14L24 42 11 31V17L24 6Z" stroke="currentColor" stroke-width="2"/>
+            <path d="M24 14v20M15 20h18M18 28h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Hermes Relay</h1>
+          <p>Browser-native capture, recall, and context handoff for Hermes Agent.</p>
+        </div>
+      </header>
+
+      <section class="panel status-panel">
+        <div class="panel-head">
+          <h2>Hermes</h2>
+          <div class="header-actions">
+            <button id="open-workspace" class="ghost-btn">Workspace</button>
+            <button id="refresh-status" class="icon-btn" title="Refresh status" aria-label="Refresh status">↻</button>
+          </div>
+        </div>
+        <div class="status-row">
+          <span id="status-dot" class="status-dot"></span>
+          <div>
+            <div id="status-label" class="status-label">Checking Hermes…</div>
+            <div id="status-meta" class="status-meta">Looking for Hermes on your machine</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Connect Once</h2>
+          <button id="save-config" class="primary-btn small">Connect</button>
+        </div>
+        <label class="field">
+          <span>Hermes API key</span>
+          <input id="api-key" type="password" placeholder="Paste your local Hermes API key">
+        </label>
+        <p class="microcopy">Hermes Relay uses your local Hermes API by default. Most people should only need this field.</p>
+        <details class="advanced">
+          <summary>Advanced settings</summary>
+          <label class="field">
+            <span>Base URL</span>
+            <input id="base-url" type="text" placeholder="http://127.0.0.1:8642">
+          </label>
+          <label class="field no-margin">
+            <span>Conversation prefix</span>
+            <input id="conversation-prefix" type="text" placeholder="hermes-relay">
+          </label>
+        </details>
+      </section>
+
+      <section class="panel hint-panel">
+        <div class="hint-title">If Hermes is not connected</div>
+        <div class="hint-body">Start Hermes with the API server enabled, then paste the same API key here.</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Use On This Page</h2>
+        </div>
+        <div class="mode-row" id="mode-row">
+          <button class="mode-chip active" data-mode="ask">Ask</button>
+          <button class="mode-chip" data-mode="summarize">Summarize</button>
+          <button class="mode-chip" data-mode="next-steps">Next Steps</button>
+          <button class="mode-chip" data-mode="draft-reply">Draft Reply</button>
+          <button class="mode-chip" data-mode="extract-tasks">Tasks</button>
+        </div>
+        <label class="field">
+          <span>Ask Hermes</span>
+          <textarea id="ask-prompt" rows="3" placeholder="What matters here?"></textarea>
+        </label>
+        <div class="target-row" id="target-row">
+          <span class="target-label">Context target</span>
+          <div class="target-chips">
+            <button class="target-chip active" data-target="auto">Auto</button>
+            <button class="target-chip" data-target="claude">Claude</button>
+            <button class="target-chip" data-target="chatgpt">ChatGPT</button>
+            <button class="target-chip" data-target="gemini">Gemini</button>
+          </div>
+        </div>
+        <div class="button-grid">
+          <button id="ask-page" class="primary-btn">Ask About Page</button>
+          <button id="capture-page" class="secondary-btn">Capture Page</button>
+          <button id="build-context" class="secondary-btn">Build Context</button>
+          <button id="inject-context" class="secondary-btn">Inject Into Chat</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Output</h2>
+          <div class="output-actions">
+            <button id="copy-output" class="ghost-btn">Copy</button>
+            <button id="open-output" class="ghost-btn">Open</button>
+          </div>
+        </div>
+        <pre id="output" class="output">Hermes responses will appear here.</pre>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Recent</h2>
+        </div>
+        <div id="recent-list" class="recent-list">
+          <div class="recent-empty">No Hermes actions yet.</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Watchlist</h2>
+        </div>
+        <div id="watchlist" class="recent-list">
+          <div class="recent-empty">No tracked pages yet.</div>
+        </div>
+      </section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+  </html>
