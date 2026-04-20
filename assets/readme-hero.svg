@@ -1,96 +1,102 @@
 <svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
   <title id="title">Hermes Relay README banner</title>
-  <desc id="desc">A dark, futuristic banner for Hermes Relay showing browser-native capture, memory, watchlists, and AI context handoff.</desc>
+  <desc id="desc">A refined Hermes Relay banner using a darker editorial palette aligned with Hermes Agent branding.</desc>
   <defs>
-    <linearGradient id="bg" x1="140" y1="40" x2="1140" y2="600" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#101B33"/>
-      <stop offset="0.55" stop-color="#0B1220"/>
-      <stop offset="1" stop-color="#070B13"/>
+    <linearGradient id="bg" x1="88" y1="36" x2="1176" y2="608" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#041816"/>
+      <stop offset="0.52" stop-color="#02110F"/>
+      <stop offset="1" stop-color="#04080A"/>
     </linearGradient>
-    <radialGradient id="glowA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(246 120) rotate(50.3) scale(402 341)">
-      <stop stop-color="#4DA2FF" stop-opacity="0.34"/>
-      <stop offset="1" stop-color="#4DA2FF" stop-opacity="0"/>
+    <radialGradient id="glowLeft" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(246 112) rotate(40) scale(420 320)">
+      <stop stop-color="#1F564D" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#1F564D" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="glowB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1040 520) rotate(180) scale(420 260)">
-      <stop stop-color="#7AD7FF" stop-opacity="0.2"/>
-      <stop offset="1" stop-color="#7AD7FF" stop-opacity="0"/>
+    <radialGradient id="glowRight" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1062 492) rotate(180) scale(340 230)">
+      <stop stop-color="#B19872" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#B19872" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="panel" x1="640" y1="120" x2="640" y2="560" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#16233A" stop-opacity="0.95"/>
-      <stop offset="1" stop-color="#0D1424" stop-opacity="0.98"/>
+    <linearGradient id="panel" x1="640" y1="150" x2="640" y2="560" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#071917" stop-opacity="0.86"/>
+      <stop offset="1" stop-color="#06100F" stop-opacity="0.92"/>
     </linearGradient>
-    <linearGradient id="accent" x1="180" y1="168" x2="948" y2="574" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#80DBFF"/>
-      <stop offset="1" stop-color="#4A82FF"/>
-    </linearGradient>
-    <filter id="shadow" x="92" y="54" width="1096" height="536" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-      <feOffset dy="18"/>
-      <feGaussianBlur stdDeviation="24"/>
-      <feComposite in2="hardAlpha" operator="out"/>
-      <feColorMatrix type="matrix" values="0 0 0 0 0.0117647 0 0 0 0 0.0352941 0 0 0 0 0.0941176 0 0 0 0.42 0"/>
-      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_2"/>
-      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_2" result="shape"/>
+    <filter id="softBlur" x="-160" y="-160" width="1600" height="960" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="40"/>
     </filter>
   </defs>
 
   <rect width="1280" height="640" rx="28" fill="url(#bg)"/>
-  <rect width="1280" height="640" rx="28" fill="url(#glowA)"/>
-  <rect width="1280" height="640" rx="28" fill="url(#glowB)"/>
+  <rect width="1280" height="640" rx="28" fill="url(#glowLeft)"/>
+  <rect width="1280" height="640" rx="28" fill="url(#glowRight)"/>
 
-  <g filter="url(#shadow)">
-    <rect x="140" y="102" width="1000" height="452" rx="28" fill="url(#panel)" stroke="rgba(134,172,255,0.22)"/>
+  <g filter="url(#softBlur)" opacity="0.16">
+    <ellipse cx="890" cy="330" rx="240" ry="230" fill="#25433C"/>
+    <ellipse cx="380" cy="540" rx="170" ry="120" fill="#8C7758"/>
   </g>
 
-  <rect x="140.5" y="102.5" width="999" height="451" rx="27.5" stroke="url(#accent)" stroke-opacity="0.18"/>
-
-  <rect x="186" y="148" width="64" height="64" rx="18" fill="#101827" stroke="#2F5D99"/>
-  <path d="M218 165L237 181V203L218 219L199 203V181L218 165Z" stroke="url(#accent)" stroke-width="2.4"/>
-  <path d="M218 177V205M205 186H231M209 197H227" stroke="url(#accent)" stroke-width="2.4" stroke-linecap="round"/>
-
-  <text x="282" y="176" fill="#EAF2FF" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" letter-spacing="0.18em">HERMES RELAY</text>
-  <text x="186" y="274" fill="#F5F8FF" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="68" font-weight="800">Browser-native Hermes</text>
-  <text x="186" y="340" fill="#C8D5EC" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="30" font-weight="500">Capture pages, save durable memory, track important work,</text>
-  <text x="186" y="382" fill="#C8D5EC" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="30" font-weight="500">and hand off clean context into Claude, ChatGPT, and Gemini.</text>
-
-  <g>
-    <rect x="186" y="430" width="150" height="42" rx="21" fill="#101A2B" stroke="#284A7D"/>
-    <text x="261" y="457" text-anchor="middle" fill="#DDEBFF" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="600">Capture</text>
-
-    <rect x="350" y="430" width="150" height="42" rx="21" fill="#101A2B" stroke="#284A7D"/>
-    <text x="425" y="457" text-anchor="middle" fill="#DDEBFF" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="600">Memory</text>
-
-    <rect x="514" y="430" width="160" height="42" rx="21" fill="#101A2B" stroke="#284A7D"/>
-    <text x="594" y="457" text-anchor="middle" fill="#DDEBFF" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="600">Watchlists</text>
-
-    <rect x="688" y="430" width="208" height="42" rx="21" fill="#101A2B" stroke="#284A7D"/>
-    <text x="792" y="457" text-anchor="middle" fill="#DDEBFF" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="600">Context Handoff</text>
+  <g opacity="0.38">
+    <rect x="34.5" y="42.5" width="1211" height="554" rx="0.5" stroke="#697159"/>
+    <path d="M34 136H1246" stroke="#697159"/>
+    <path d="M34 534H1246" stroke="#697159"/>
+    <path d="M210 42V136" stroke="#697159"/>
+    <path d="M440 42V136" stroke="#697159"/>
+    <path d="M670 42V136" stroke="#697159"/>
+    <path d="M900 42V136" stroke="#697159"/>
+    <path d="M1128 42V136" stroke="#697159"/>
+    <path d="M640 534V596" stroke="#697159"/>
   </g>
 
   <g>
-    <rect x="880" y="172" width="200" height="118" rx="20" fill="#0C1321" stroke="#233A60"/>
-    <rect x="904" y="198" width="86" height="12" rx="6" fill="#7AD7FF" fill-opacity="0.9"/>
-    <rect x="904" y="222" width="120" height="10" rx="5" fill="#6B7A97" fill-opacity="0.55"/>
-    <rect x="904" y="242" width="98" height="10" rx="5" fill="#6B7A97" fill-opacity="0.42"/>
-    <rect x="904" y="262" width="144" height="10" rx="5" fill="#6B7A97" fill-opacity="0.28"/>
-    <circle cx="1040" cy="210" r="18" fill="#10233E" stroke="#2A5FA0"/>
-    <path d="M1032 210L1038 216L1048 204" stroke="#7AD7FF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="50" y="82" fill="#E9D8C2" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" letter-spacing="0.08em">HERMES</text>
+    <text x="50" y="118" fill="#E9D8C2" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" letter-spacing="0.08em">RELAY</text>
+  </g>
+
+  <text x="244" y="79" fill="#A79C83" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="600" letter-spacing="0.28em">BROWSER WORKSPACE FOR HERMES AGENT</text>
+  <text x="1204" y="74" text-anchor="end" fill="#A79C83" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="600" letter-spacing="0.26em">README HERO</text>
+
+  <rect x="1084" y="58" width="64" height="26" rx="13" fill="#111A18" stroke="#7A715C" stroke-opacity="0.68"/>
+  <circle cx="1100" cy="71" r="8" fill="#E9D8C2"/>
+  <circle cx="1126" cy="71" r="7" stroke="#7A715C" stroke-width="1.4"/>
+  <path d="M1126 65V71L1130 74" stroke="#7A715C" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="70" y="168" width="1140" height="328" fill="url(#panel)" stroke="#28413C" stroke-opacity="0.82"/>
+
+  <text x="86" y="248" fill="#F2E8D9" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="72" font-weight="800" letter-spacing="-0.04em">A browser workspace</text>
+  <text x="86" y="320" fill="#F2E8D9" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="72" font-weight="800" letter-spacing="-0.04em">for Hermes</text>
+
+  <text x="86" y="386" fill="#C2B7A4" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="26" font-weight="500">Capture pages, save durable memory, track important work,</text>
+  <text x="86" y="424" fill="#C2B7A4" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="26" font-weight="500">and hand off clean context into Claude, ChatGPT, and Gemini.</text>
+
+  <text x="86" y="566" fill="#E9D8C2" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" letter-spacing="0.22em">CAPTURE</text>
+  <text x="222" y="566" fill="#8FA196" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" letter-spacing="0.22em">MEMORY</text>
+  <text x="352" y="566" fill="#8FA196" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" letter-spacing="0.22em">WATCHLISTS</text>
+  <text x="546" y="566" fill="#8FA196" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" letter-spacing="0.22em">CONTEXT HANDOFF</text>
+
+  <g>
+    <rect x="842" y="188" width="172" height="24" rx="12" fill="#0A1413" stroke="#27433D"/>
+    <text x="858" y="205" fill="#A79C83" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" letter-spacing="0.24em">MEMORY RECEIPT</text>
+    <rect x="842" y="220" width="286" height="134" rx="22" fill="#091110" stroke="#28413C"/>
+    <rect x="870" y="250" width="96" height="14" rx="7" fill="#8FC9BD"/>
+    <rect x="870" y="278" width="154" height="11" rx="5.5" fill="#455348"/>
+    <rect x="870" y="301" width="126" height="11" rx="5.5" fill="#39473E"/>
+    <rect x="870" y="324" width="176" height="11" rx="5.5" fill="#2D3C35"/>
+    <circle cx="1082" cy="262" r="18" fill="#10201C" stroke="#4D7E72"/>
+    <path d="M1074 262L1080 268L1091 255" stroke="#8FC9BD" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 
   <g>
-    <rect x="860" y="316" width="220" height="168" rx="22" fill="#0C1321" stroke="#233A60"/>
-    <text x="888" y="352" fill="#E8F1FF" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="700">Assistant handoff</text>
-    <rect x="888" y="372" width="96" height="26" rx="13" fill="#10233E" stroke="#2A5FA0"/>
-    <text x="936" y="389" text-anchor="middle" fill="#BFE6FF" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="600">ChatGPT</text>
-    <rect x="994" y="372" width="86" height="26" rx="13" fill="#10233E" stroke="#2A5FA0"/>
-    <text x="1037" y="389" text-anchor="middle" fill="#BFE6FF" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="600">Claude</text>
-    <rect x="888" y="412" width="166" height="10" rx="5" fill="#6B7A97" fill-opacity="0.56"/>
-    <rect x="888" y="432" width="152" height="10" rx="5" fill="#6B7A97" fill-opacity="0.4"/>
-    <rect x="888" y="452" width="126" height="10" rx="5" fill="#6B7A97" fill-opacity="0.28"/>
+    <rect x="820" y="376" width="336" height="136" rx="22" fill="#091110" stroke="#28413C"/>
+    <text x="848" y="414" fill="#F2E8D9" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="700">Assistant handoff</text>
+    <rect x="848" y="432" width="104" height="28" rx="14" fill="#0D1917" stroke="#49685E"/>
+    <text x="900" y="451" text-anchor="middle" fill="#D6C9B5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="600">ChatGPT</text>
+    <rect x="964" y="432" width="90" height="28" rx="14" fill="#0D1917" stroke="#49685E"/>
+    <text x="1009" y="451" text-anchor="middle" fill="#D6C9B5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="600">Claude</text>
+    <rect x="1066" y="432" width="74" height="28" rx="14" fill="#0D1917" stroke="#49685E"/>
+    <text x="1103" y="451" text-anchor="middle" fill="#D6C9B5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="600">Gemini</text>
+    <rect x="848" y="476" width="220" height="10" rx="5" fill="#49564B"/>
+    <rect x="848" y="496" width="184" height="10" rx="5" fill="#34413A"/>
   </g>
 
-  <circle cx="1122" cy="124" r="4" fill="#7AD7FF" fill-opacity="0.9"/>
-  <circle cx="1096" cy="104" r="2.5" fill="#7AD7FF" fill-opacity="0.5"/>
-  <circle cx="1108" cy="528" r="3" fill="#4DA2FF" fill-opacity="0.54"/>
+  <circle cx="1178" cy="182" r="2.5" fill="#84B7AB"/>
+  <circle cx="1204" cy="466" r="2.5" fill="#84B7AB"/>
+  <circle cx="1200" cy="86" r="1.8" fill="#7A715C"/>
 </svg>
