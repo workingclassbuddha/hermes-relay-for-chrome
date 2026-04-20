@@ -195,6 +195,24 @@ summary:focus-visible {
   color: var(--muted);
 }
 
+.continuity-banner {
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  background: rgba(5, 10, 9, 0.72);
+  color: var(--text);
+}
+
+.continuity-banner.seen {
+  border-color: rgba(143, 177, 163, 0.44);
+  background: rgba(98, 124, 112, 0.16);
+}
+
+.continuity-banner.new {
+  border-color: rgba(118, 127, 104, 0.18);
+}
+
 .status-meta,
 .microcopy,
 .hint-title,
@@ -286,6 +304,14 @@ summary:focus-visible {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+.compact-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.wide {
+  grid-column: 1 / -1;
 }
 
 .primary-btn,

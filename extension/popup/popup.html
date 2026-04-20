@@ -16,8 +16,8 @@
           </svg>
         </div>
         <div>
-          <h1>Hermes Relay for Chrome</h1>
-          <p>Direct browser context, capture, and handoff for Hermes Agent.</p>
+          <h1>Hermes Relay</h1>
+          <p>Hermes’ fast browser launcher. Open the workspace when the page matters.</p>
         </div>
       </header>
 
@@ -47,7 +47,7 @@
           <span>Hermes API key</span>
           <input id="api-key" type="password" placeholder="Paste your local Hermes API key">
         </label>
-        <p class="microcopy">Hermes Relay for Chrome uses your local Hermes API by default. Most people should only need this field.</p>
+        <p class="microcopy">Most people only need to paste the local API key once. Advanced settings stay tucked away.</p>
         <details class="advanced">
           <summary>Advanced settings</summary>
           <label class="field">
@@ -61,72 +61,41 @@
         </details>
       </section>
 
-      <section class="panel hint-panel">
-        <div class="hint-title">If Hermes is not connected</div>
-        <div class="hint-body">Start Hermes with the API server enabled, then paste the same API key here.</div>
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Current Page</h2>
+        </div>
+        <div id="page-title" class="recent-title">Loading page…</div>
+        <div id="page-meta" class="recent-meta">Looking at the active tab</div>
+        <div id="page-continuity" class="continuity-banner new">Checking whether Hermes has seen this page before…</div>
       </section>
 
       <section class="panel">
         <div class="panel-head">
-          <h2>Use On This Page</h2>
-        </div>
-        <div class="mode-row" id="mode-row">
-          <button class="mode-chip active" data-mode="ask">Ask</button>
-          <button class="mode-chip" data-mode="summarize">Summarize</button>
-          <button class="mode-chip" data-mode="next-steps">Next Steps</button>
-          <button class="mode-chip" data-mode="draft-reply">Draft Reply</button>
-          <button class="mode-chip" data-mode="extract-tasks">Tasks</button>
+          <h2>Quick Actions</h2>
         </div>
         <label class="field">
-          <span>Ask Hermes</span>
-          <textarea id="ask-prompt" rows="3" placeholder="What matters here?"></textarea>
+          <span>Optional prompt</span>
+          <textarea id="ask-prompt" rows="3" placeholder="What matters here? What changed? What should I do next?"></textarea>
         </label>
-        <div class="target-row" id="target-row">
-          <span class="target-label">Context target</span>
-          <div class="target-chips">
-            <button class="target-chip active" data-target="auto">Auto</button>
-            <button class="target-chip" data-target="claude">Claude</button>
-            <button class="target-chip" data-target="chatgpt">ChatGPT</button>
-            <button class="target-chip" data-target="gemini">Gemini</button>
-          </div>
-        </div>
-        <div class="button-grid">
-          <button id="ask-page" class="primary-btn">Ask About Page</button>
-          <button id="capture-page" class="secondary-btn">Capture Page</button>
-          <button id="build-context" class="secondary-btn">Build Context</button>
-          <button id="inject-context" class="secondary-btn">Inject Into Chat</button>
+        <div class="button-grid compact-grid">
+          <button id="summarize-page" class="primary-btn">Summarize Page</button>
+          <button id="ask-page" class="secondary-btn">Ask Hermes</button>
+          <button id="inject-context" class="secondary-btn">Build + Insert Context</button>
+          <button id="open-workspace-cta" class="ghost-btn wide">Open Full Workspace</button>
         </div>
       </section>
 
       <section class="panel">
         <div class="panel-head">
-          <h2>Output</h2>
+          <h2>Latest Workspace Output</h2>
           <div class="output-actions">
             <button id="copy-output" class="ghost-btn">Copy</button>
-            <button id="open-output" class="ghost-btn">Open</button>
           </div>
         </div>
         <pre id="output" class="output">Hermes responses will appear here.</pre>
       </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <h2>Recent</h2>
-        </div>
-        <div id="recent-list" class="recent-list">
-          <div class="recent-empty">No Hermes actions yet.</div>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <h2>Watchlist</h2>
-        </div>
-        <div id="watchlist" class="recent-list">
-          <div class="recent-empty">No tracked pages yet.</div>
-        </div>
-      </section>
     </main>
     <script src="popup.js"></script>
   </body>
-  </html>
+</html>

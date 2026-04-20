@@ -43,24 +43,26 @@ flowchart LR
 
 ### Popup
 
-The popup is designed for fast, in-the-moment work:
+The popup is now a fast launcher instead of a mini workspace:
 
 - local Hermes connection flow
-- quick page actions
-- recent runs
-- watchlist preview for tracked pages
-- build and inject context without leaving the page
+- current-page continuity check so you can tell whether Hermes has seen this page before
+- one-field quick prompt
+- fast actions for summarizing the page, asking Hermes, building context, and jumping into the full workspace
+- latest workspace output preview
 
 ### Workspace side panel
 
-The side panel is the heavier workspace for ongoing page work:
+The side panel is the primary workspace for ongoing page work:
 
 - current-page context view
+- continuity banner for pages Hermes has already seen
 - page notes
 - page snapshots and snapshot comparison
+- direct line thread for page-aware conversation
 - workflow runner
 - memory actions
-- tracked-page watchlist with search and pinning
+- tracked-page review with search and pinning
 - workspace history
 
 ### Browser integration
@@ -177,12 +179,12 @@ A good first run looks like this:
 
 ## Context menus
 
-Hermes Relay adds browser context-menu actions for quick, in-page use:
+Hermes Relay adds browser context-menu actions for quick, in-page use. Selection and page actions now route into the Hermes Workspace side panel by default so your browsing flow stays intact:
 
-- **Ask Hermes about this selection**
-- **Remember this with Hermes**
-- **Send this page to Hermes**
-- **Inject Hermes context here**
+- **Explain this selection with Hermes**
+- **Save this selection to Hermes memory**
+- **Open this page in Hermes Workspace**
+- **Insert latest Hermes context here**
 
 ---
 

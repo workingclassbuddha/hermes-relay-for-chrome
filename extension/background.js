@@ -15,6 +15,26 @@ const CONTEXT_MENU_IDS = {
   injectContext: 'hermes-relay-inject-context',
 };
 
+const DEFAULT_WORKSPACE_STATE = {
+  prompt: '',
+  directPrompt: '',
+  mode: 'ask',
+  target: 'auto',
+  output: '',
+  lastAction: '',
+  pageLock: false,
+  lockedPageUrl: '',
+  trackedSearch: '',
+  trackedPinnedOnly: false,
+  source: '',
+  updatedAt: '',
+};
+
+const DEFAULT_WORKSPACE_STORE = {
+  global: { ...DEFAULT_WORKSPACE_STATE },
+  byPage: {},
+};
+
 async function getDirectThreads() {
   const data = await chrome.storage.local.get({ directThreads: {} });
   return data.directThreads;
@@ -22,6 +42,99 @@ async function getDirectThreads() {
 
 async function saveDirectThreads(threads) {
   await chrome.storage.local.set({ directThreads: threads });
+}
+
+async function getWorkspaceStateStore() {
+  const data = await chrome.storage.local.get({
+    workspaceState: DEFAULT_WORKSPACE_STATE,
+    workspaceStateGlobal: DEFAULT_WORKSPACE_STORE.global,
+    workspaceStateByPage: DEFAULT_WORKSPACE_STORE.byPage,
+  });
+
+  const global = {
+    ...DEFAULT_WORKSPACE_STATE,
+    ...(data.workspaceStateGlobal || data.workspaceState || {}),
+  };
+
+  return {
+    global,
+    byPage: data.workspaceStateByPage || {},
+  };
+}
+
+async function saveWorkspaceStateStore(store) {
+  await chrome.storage.local.set({
+    workspaceState: store.global,
+    workspaceStateGlobal: store.global,
+    workspaceStateByPage: store.byPage,
+  });
+}
+
+async function resolveWorkspaceStateKey({ url = '', useActivePage = false } = {}) {
+  if (url) {
+    return canonicalizeUrl(url);
+  }
+
+  if (!useActivePage) {
+    return '';
+  }
+
+  const activeTab = await getActiveTab();
+  if (!activeTab?.id) {
+    return canonicalizeUrl(activeTab?.url || '');
+  }
+
+  let activePage = null;
+  try {
+    activePage = await extractPageContext(activeTab.id);
+  } catch (_) {
+    activePage = null;
+  }
+  return canonicalizeUrl(activePage?.url || activeTab?.url || '');
+}
+
+async function getWorkspaceState(scope = {}) {
+  const store = await getWorkspaceStateStore();
+  const key = await resolveWorkspaceStateKey(scope);
+
+  if (!key) {
+    return store.global;
+  }
+
+  return {
+    ...DEFAULT_WORKSPACE_STATE,
+    ...(store.byPage[key] || {}),
+  };
+}
+
+async function setWorkspaceState(patch = {}, scope = {}) {
+  const store = await getWorkspaceStateStore();
+  const key = await resolveWorkspaceStateKey(scope);
+  const next = {
+    ...DEFAULT_WORKSPACE_STATE,
+    ...(key ? store.byPage[key] : store.global),
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (key) {
+    store.byPage[key] = next;
+  } else {
+    store.global = next;
+  }
+
+  await saveWorkspaceStateStore(store);
+  return next;
+}
+
+function canonicalizeUrl(url) {
+  try {
+    const parsed = new URL(String(url || ''));
+    parsed.hash = '';
+    return parsed.toString();
+  } catch (_) {
+    return String(url || '').split('#')[0];
+  }
 }
 
 async function getConfig() {
@@ -147,7 +260,8 @@ async function getPageNotes() {
 
 async function getPageNote(url) {
   const notes = await getPageNotes();
-  return notes[url] || '';
+  const key = canonicalizeUrl(url);
+  return notes[key] || '';
 }
 
 async function savePageNote(url, note) {
@@ -155,12 +269,13 @@ async function savePageNote(url, note) {
     throw new Error('No page URL available for notes.');
   }
   const notes = await getPageNotes();
-  notes[url] = {
+  const key = canonicalizeUrl(url);
+  notes[key] = {
     text: note,
     updatedAt: new Date().toISOString(),
   };
   await chrome.storage.local.set({ pageNotes: notes });
-  return notes[url];
+  return notes[key];
 }
 
 async function getTrackedPages() {
@@ -187,12 +302,13 @@ async function upsertTrackedPage(page, pin = true) {
     throw new Error('No page URL available to track.');
   }
 
+  const normalizedUrl = canonicalizeUrl(page.url);
   const items = await getTrackedPages();
-  const existing = items.find((item) => item.url === page.url);
+  const existing = items.find((item) => canonicalizeUrl(item.url) === normalizedUrl);
   const now = new Date().toISOString();
   const nextItem = {
     id: existing?.id || crypto.randomUUID(),
-    url: page.url,
+    url: normalizedUrl,
     title: page.title || existing?.title || 'Tracked page',
     hostname: page.hostname || existing?.hostname || '',
     pageType: page.pageType || existing?.pageType || 'page',
@@ -202,7 +318,7 @@ async function upsertTrackedPage(page, pin = true) {
     createdAt: existing?.createdAt || now,
   };
 
-  const next = [nextItem, ...items.filter((item) => item.url !== page.url)].slice(0, 30);
+  const next = [nextItem, ...items.filter((item) => canonicalizeUrl(item.url) !== normalizedUrl)].slice(0, 30);
   await chrome.storage.local.set({ trackedPages: next });
   return nextItem;
 }
@@ -212,10 +328,11 @@ async function updateTrackedPage(url, patch = {}) {
     throw new Error('No page URL available to update.');
   }
 
+  const normalizedUrl = canonicalizeUrl(url);
   const items = await getTrackedPages();
   let updated = null;
   const next = items.map((item) => {
-    if (item.url !== url) {
+    if (canonicalizeUrl(item.url) !== normalizedUrl) {
       return item;
     }
     updated = {
@@ -235,8 +352,9 @@ async function updateTrackedPage(url, patch = {}) {
 }
 
 async function removeTrackedPage(url) {
+  const normalizedUrl = canonicalizeUrl(url);
   const items = await getTrackedPages();
-  const next = items.filter((item) => item.url !== url);
+  const next = items.filter((item) => canonicalizeUrl(item.url) !== normalizedUrl);
   await chrome.storage.local.set({ trackedPages: next });
   return { removed: items.length !== next.length };
 }
@@ -279,7 +397,8 @@ async function getSnapshots() {
 
 async function getSnapshotsForUrl(url) {
   const items = await getSnapshots();
-  return items.filter((item) => item.url === url);
+  const normalizedUrl = canonicalizeUrl(url);
+  return items.filter((item) => canonicalizeUrl(item.url) === normalizedUrl);
 }
 
 function makePageDigest(page) {
@@ -297,9 +416,10 @@ async function saveSnapshot(page, source = 'workspace') {
     throw new Error('No page URL available for snapshot.');
   }
 
+  const normalizedUrl = canonicalizeUrl(page.url);
   const existing = await getSnapshots();
   const digest = makePageDigest(page);
-  const sameUrl = existing.filter((item) => item.url === page.url);
+  const sameUrl = existing.filter((item) => canonicalizeUrl(item.url) === normalizedUrl);
   const latest = sameUrl[0];
 
   if (latest?.digest === digest) {
@@ -313,7 +433,7 @@ async function saveSnapshot(page, source = 'workspace') {
     id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
     title: page.title || 'Current page',
-    url: page.url,
+    url: normalizedUrl,
     hostname: page.hostname || '',
     description: page.description || '',
     headings: page.headings || [],
@@ -327,7 +447,7 @@ async function saveSnapshot(page, source = 'workspace') {
   await chrome.storage.local.set({ pageSnapshots: next });
   try {
     const tracked = await getTrackedPages();
-    const updatedTracked = tracked.map((item) => item.url === page.url
+    const updatedTracked = tracked.map((item) => canonicalizeUrl(item.url) === normalizedUrl
       ? { ...item, lastSnapshotAt: snapshot.timestamp, title: page.title || item.title }
       : item);
     await chrome.storage.local.set({ trackedPages: updatedTracked });
@@ -397,13 +517,14 @@ function buildConversationId(config, suffix) {
 }
 
 function buildDirectThreadMeta(config, page, tab) {
-  const seed = page?.url || tab?.url || `tab-${tab?.id || 'current'}`;
+  const normalizedUrl = canonicalizeUrl(page?.url || tab?.url || '');
+  const seed = normalizedUrl || `tab-${tab?.id || 'current'}`;
   const suffix = `direct-${hashString(seed)}`;
   return {
     threadKey: suffix,
     conversation: buildConversationId(config, suffix),
     title: page?.title || tab?.title || 'Current page',
-    url: page?.url || tab?.url || '',
+    url: normalizedUrl,
   };
 }
 
@@ -583,6 +704,13 @@ async function getDirectThread(page = null, tab = null) {
     throw new Error('No active tab available.');
   }
 
+  if (activePage?.url) {
+    activePage = {
+      ...activePage,
+      url: canonicalizeUrl(activePage.url),
+    };
+  }
+
   const config = await getConfig();
   const meta = buildDirectThreadMeta(config, activePage, activeTab);
   const threads = await getDirectThreads();
@@ -595,6 +723,79 @@ async function getDirectThread(page = null, tab = null) {
     },
     page: activePage,
     tab: activeTab,
+  };
+}
+
+async function summarizePageContinuity(page = null, tab = null) {
+  let activeTab = tab;
+  let activePage = page;
+
+  if (!activeTab) {
+    activeTab = await getActiveTab();
+  }
+  if (!activePage && activeTab?.id) {
+    activePage = await extractPageContext(activeTab.id);
+  }
+  if (!activePage?.url) {
+    return {
+      seenBefore: false,
+      status: 'new',
+      message: 'Hermes has not seen this page yet.',
+      noteCount: 0,
+      snapshotCount: 0,
+      tracked: false,
+      directMessageCount: 0,
+      lastSeenAt: '',
+      lastSnapshotAt: '',
+      lastNotedAt: '',
+      threadUpdatedAt: '',
+      canonicalUrl: '',
+    };
+  }
+
+  const canonicalUrl = canonicalizeUrl(activePage.url);
+  const [notes, snapshots, trackedPages, direct] = await Promise.all([
+    getPageNotes(),
+    getSnapshots(),
+    getTrackedPages(),
+    getDirectThread({ ...activePage, url: canonicalUrl }, activeTab),
+  ]);
+
+  const note = notes[canonicalUrl] || null;
+  const snapshotItems = snapshots.filter((item) => canonicalizeUrl(item.url) === canonicalUrl);
+  const tracked = trackedPages.find((item) => canonicalizeUrl(item.url) === canonicalUrl) || null;
+  const directMessageCount = Array.isArray(direct.thread?.messages) ? direct.thread.messages.length : 0;
+  const seenBefore = Boolean(note?.text || snapshotItems.length || tracked || directMessageCount);
+  const lastSeenAt = tracked?.lastSeenAt || tracked?.createdAt || '';
+  const threadUpdatedAt = direct.thread?.updatedAt || '';
+  const lastSnapshotAt = snapshotItems[0]?.timestamp || tracked?.lastSnapshotAt || '';
+  const lastNotedAt = note?.updatedAt || '';
+
+  let message = 'Hermes has not seen this page yet.';
+  if (seenBefore) {
+    const facts = [];
+    if (tracked) facts.push(tracked.pinned ? 'tracked + pinned' : 'tracked');
+    if (note?.text) facts.push('has note');
+    if (snapshotItems.length) facts.push(`${snapshotItems.length} snapshot${snapshotItems.length === 1 ? '' : 's'}`);
+    if (directMessageCount) facts.push(`${directMessageCount} direct message${directMessageCount === 1 ? '' : 's'}`);
+    message = `Hermes has seen this page before${facts.length ? ` • ${facts.join(' • ')}` : ''}`;
+  }
+
+  return {
+    seenBefore,
+    status: seenBefore ? 'seen' : 'new',
+    message,
+    noteCount: note?.text ? 1 : 0,
+    snapshotCount: snapshotItems.length,
+    tracked: Boolean(tracked),
+    pinned: Boolean(tracked?.pinned),
+    notePreview: summarizeNote(note?.text || '', 120),
+    directMessageCount,
+    lastSeenAt,
+    lastSnapshotAt,
+    lastNotedAt,
+    threadUpdatedAt,
+    canonicalUrl,
   };
 }
 
@@ -1063,22 +1264,22 @@ async function openSidePanel() {
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: CONTEXT_MENU_IDS.askSelection,
-    title: 'Ask Hermes about this selection',
+    title: 'Explain this selection with Hermes',
     contexts: ['selection'],
   });
   chrome.contextMenus.create({
     id: CONTEXT_MENU_IDS.rememberSelection,
-    title: 'Remember this with Hermes',
+    title: 'Save this selection to Hermes memory',
     contexts: ['selection'],
   });
   chrome.contextMenus.create({
     id: CONTEXT_MENU_IDS.sendPage,
-    title: 'Send this page to Hermes',
+    title: 'Open this page in Hermes Workspace',
     contexts: ['page'],
   });
   chrome.contextMenus.create({
     id: CONTEXT_MENU_IDS.injectContext,
-    title: 'Inject Hermes context here',
+    title: 'Insert latest Hermes context here',
     contexts: ['editable'],
   });
 });
@@ -1086,40 +1287,81 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   try {
     if (info.menuItemId === CONTEXT_MENU_IDS.askSelection && info.selectionText) {
-      await sendDirectLineMessage({
+      const result = await sendDirectLineMessage({
         tab,
         selectionText: info.selectionText.trim(),
         prompt: 'Focus on this selection and tell me what matters.',
         source: 'context-selection',
       });
+      await setWorkspaceState(
+        {
+          output: result.text || '',
+          lastAction: 'selection-explain',
+          source: 'context-menu',
+        },
+        { url: tab?.url || '' },
+      );
       await openSidePanel();
     }
 
     if (info.menuItemId === CONTEXT_MENU_IDS.rememberSelection && info.selectionText) {
-      await sendDirectLineMessage({
+      const result = await sendDirectLineMessage({
         tab,
         selectionText: info.selectionText.trim(),
         prompt: 'Look at this selection, decide what should be remembered, and tell me what to do next.',
         source: 'context-remember',
       });
+      await setWorkspaceState(
+        {
+          output: result.text || '',
+          lastAction: 'selection-memory',
+          source: 'context-menu',
+        },
+        { url: tab?.url || '' },
+      );
       await openSidePanel();
     }
 
     if (info.menuItemId === CONTEXT_MENU_IDS.sendPage) {
-      await sendDirectLineMessage({
+      const result = await sendDirectLineMessage({
         tab,
         prompt: 'Take in this whole page and tell me what matters and what I should do next.',
         source: 'context-page',
       });
+      await setWorkspaceState(
+        {
+          output: result.text || '',
+          lastAction: 'page-direct-line',
+          source: 'context-menu',
+        },
+        { url: tab?.url || '' },
+      );
       await openSidePanel();
     }
 
     if (info.menuItemId === CONTEXT_MENU_IDS.injectContext) {
       const result = await buildInjectableContext('Continue from the current page and focused task.', 'auto');
+      await setWorkspaceState(
+        {
+          output: result.text || '',
+          target: result.target || 'auto',
+          lastAction: 'inject-context',
+          source: 'context-menu',
+        },
+        { url: tab?.url || '' },
+      );
       await injectIntoActiveTab(result.text);
     }
   } catch (error) {
-    await openContextResult(error.message || String(error), 'Hermes Relay error');
+    await setWorkspaceState(
+      {
+        output: error.message || String(error),
+        lastAction: 'error',
+        source: 'context-menu',
+      },
+      { url: tab?.url || '' },
+    );
+    await openSidePanel();
   }
 });
 
@@ -1166,7 +1408,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
       const page = await extractPageContext(tab.id);
       const note = await getPageNote(page.url);
-      sendResponse({ ok: true, page, tab, note });
+      const continuity = await summarizePageContinuity(page, tab);
+      sendResponse({ ok: true, page, tab, note, continuity });
       return;
     }
 
@@ -1218,6 +1461,28 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       sendResponse({
         ok: true,
         recentActions: await getRecentActions(),
+      });
+      return;
+    }
+
+    if (message.type === 'GET_WORKSPACE_STATE') {
+      sendResponse({
+        ok: true,
+        workspaceState: await getWorkspaceState({
+          url: message.url || '',
+          useActivePage: Boolean(message.useActivePage),
+        }),
+      });
+      return;
+    }
+
+    if (message.type === 'SAVE_WORKSPACE_STATE') {
+      sendResponse({
+        ok: true,
+        workspaceState: await setWorkspaceState(message.patch || {}, {
+          url: message.url || '',
+          useActivePage: Boolean(message.useActivePage),
+        }),
       });
       return;
     }

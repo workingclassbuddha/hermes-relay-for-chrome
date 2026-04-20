@@ -90,6 +90,32 @@ select {
   margin-bottom: 10px;
 }
 
+.continuity-banner {
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  background: rgba(35, 40, 25, 0.82);
+  color: var(--text);
+}
+
+.continuity-banner.seen {
+  border-color: #95a66b;
+  background: rgba(82, 99, 48, 0.22);
+}
+
+.continuity-banner.new {
+  border-color: var(--border);
+  background: rgba(35, 40, 25, 0.82);
+}
+
+.continuity-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 .tag-list {
   display: flex;
   flex-wrap: wrap;

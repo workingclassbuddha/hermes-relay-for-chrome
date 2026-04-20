@@ -6,10 +6,12 @@ let currentMode = 'ask';
 let currentPage = null;
 let currentOutput = '';
 let currentNote = '';
+let currentContinuity = null;
 let trackedItems = [];
 let trackedSearch = '';
 let trackedPinnedOnly = false;
 let currentDirectThread = null;
+let currentWorkspaceUrl = '';
 
 function relativeTime(iso) {
   const delta = Date.now() - new Date(iso).getTime();
@@ -25,9 +27,70 @@ async function sendMessage(message) {
   return chrome.runtime.sendMessage(message);
 }
 
+function persistWorkspaceState(extra = {}) {
+  sendMessage({
+    type: 'SAVE_WORKSPACE_STATE',
+    url: currentPage?.url || '',
+    useActivePage: !currentPage?.url,
+    patch: {
+      prompt: $('workspace-prompt')?.value || '',
+      directPrompt: $('direct-prompt')?.value || '',
+      mode: currentMode,
+      target: $('workspace-target')?.value || 'auto',
+      output: currentOutput || '',
+      trackedSearch,
+      trackedPinnedOnly,
+      ...extra,
+    },
+  }).catch(() => {});
+}
+
+function applyWorkspaceState(state = {}, { persist = false } = {}) {
+  currentMode = state.mode || 'ask';
+  trackedSearch = String(state.trackedSearch || '').trim().toLowerCase();
+  trackedPinnedOnly = Boolean(state.trackedPinnedOnly);
+  $('workspace-prompt').value = state.prompt || '';
+  $('direct-prompt').value = state.directPrompt || '';
+  $('workspace-target').value = state.target || 'auto';
+  $('tracked-search').value = state.trackedSearch || '';
+  $('tracked-filter-toggle').textContent = `Pinned Only: ${trackedPinnedOnly ? 'On' : 'Off'}`;
+  setMode(currentMode, { persist });
+  currentOutput = state.output || '';
+  $('workspace-output').textContent = currentOutput || 'Hermes output will appear here.';
+}
+
 function setOutput(text) {
   currentOutput = text || '';
   $('workspace-output').textContent = currentOutput || 'Hermes output will appear here.';
+  persistWorkspaceState();
+}
+
+function renderContinuity(continuity) {
+  currentContinuity = continuity || null;
+  const banner = $('page-continuity');
+  const stats = $('page-memory-stats');
+  const seen = Boolean(continuity?.seenBefore);
+  banner.classList.toggle('seen', seen);
+  banner.classList.toggle('new', !seen);
+  banner.textContent = continuity?.message || 'Hermes has not seen this page yet.';
+
+  const chips = [];
+  if (continuity?.tracked) chips.push(continuity?.pinned ? 'Tracked + pinned' : 'Tracked');
+  if (continuity?.noteCount) chips.push('Has note');
+  if (continuity?.snapshotCount) chips.push(`${continuity.snapshotCount} snapshot${continuity.snapshotCount === 1 ? '' : 's'}`);
+  if (continuity?.directMessageCount) chips.push(`${continuity.directMessageCount} direct message${continuity.directMessageCount === 1 ? '' : 's'}`);
+  stats.innerHTML = chips.length
+    ? chips.map((chip) => `<span class="tag">${escapeHtml(chip)}</span>`).join('')
+    : '<span class="tag">New to Hermes</span>';
+}
+
+async function restoreWorkspaceState() {
+  const response = await sendMessage({
+    type: 'GET_WORKSPACE_STATE',
+    url: currentPage?.url || '',
+    useActivePage: !currentPage?.url,
+  });
+  applyWorkspaceState(response.workspaceState || {}, { persist: false });
 }
 
 function renderDirectThread(thread) {
@@ -51,16 +114,19 @@ function renderDirectThread(thread) {
   root.scrollTop = root.scrollHeight;
 }
 
-function renderPage(page, tab, note) {
+function renderPage(page, tab, note, continuity) {
   currentPage = page;
   currentNote = note?.text || '';
+  currentContinuity = continuity || null;
   $('page-title').textContent = page?.title || tab?.title || 'Untitled page';
   $('page-meta').textContent = [page?.hostname, page?.pageType, page?.url].filter(Boolean).join(' · ');
   $('page-note').value = currentNote;
+  $('track-page').textContent = continuity?.tracked ? 'Tracked' : 'Track Page';
   const headings = Array.isArray(page?.headings) ? page.headings : [];
   $('page-headings').innerHTML = headings.length
     ? headings.slice(0, 6).map((heading) => `<span class="tag">${escapeHtml(heading)}</span>`).join('')
     : '<span class="tag">No headings found</span>';
+  renderContinuity(continuity);
 }
 
 function escapeHtml(text) {
@@ -183,12 +249,17 @@ async function refreshSnapshots() {
 }
 
 async function refreshPage() {
+  const previousWorkspaceUrl = currentWorkspaceUrl;
   const response = await sendMessage({ type: 'GET_ACTIVE_PAGE_CONTEXT' });
   if (!response.ok) {
     setOutput(response.error || 'Could not read the active page.');
     return;
   }
-  renderPage(response.page, response.tab, response.note);
+  renderPage(response.page, response.tab, response.note, response.continuity);
+  currentWorkspaceUrl = String(response.page?.url || response.tab?.url || '').split('#')[0];
+  if (currentWorkspaceUrl !== previousWorkspaceUrl) {
+    await restoreWorkspaceState();
+  }
   await refreshSnapshots();
   await refreshDirectThread();
 }
@@ -205,11 +276,14 @@ async function refreshDirectThread() {
   renderDirectThread(response.thread);
 }
 
-function setMode(mode) {
+function setMode(mode, { persist = true } = {}) {
   currentMode = mode;
   document.querySelectorAll('.workflow-btn').forEach((button) => {
     button.classList.toggle('active', button.dataset.mode === mode);
   });
+  if (persist) {
+    persistWorkspaceState();
+  }
 }
 
 async function runCurrentWorkflow(injectAfter) {
@@ -217,9 +291,10 @@ async function runCurrentWorkflow(injectAfter) {
     await refreshPage();
   }
 
+  const executionMode = injectAfter ? 'inject' : currentMode;
   const response = await sendMessage({
     type: 'RUN_WORKFLOW',
-    mode: currentMode,
+    mode: executionMode,
     prompt: $('workspace-prompt').value.trim(),
     target: $('workspace-target').value,
     page: currentPage,
@@ -231,9 +306,13 @@ async function runCurrentWorkflow(injectAfter) {
   }
 
   setOutput(response.text || '');
+  persistWorkspaceState({
+    lastAction: injectAfter ? 'build-context' : `workflow-${executionMode}`,
+    target: $('workspace-target').value,
+  });
   await refreshHistory();
 
-  if (injectAfter || currentMode === 'inject') {
+  if (injectAfter) {
     const injected = await sendMessage({
       type: 'INJECT_CONTEXT',
       text: response.text || '',
@@ -264,9 +343,11 @@ $('send-direct').addEventListener('click', async () => {
   }
 
   $('direct-prompt').value = '';
+  persistWorkspaceState({ lastAction: 'direct-line' });
   renderDirectThread(response.thread);
   setOutput(response.text || '');
   await refreshHistory();
+  await refreshPage();
 });
 
 $('clear-direct').addEventListener('click', async () => {
@@ -279,6 +360,8 @@ $('clear-direct').addEventListener('click', async () => {
     return;
   }
   renderDirectThread(response.thread);
+  persistWorkspaceState({ lastAction: 'clear-direct' });
+  await refreshPage();
 });
 
 $('track-page').addEventListener('click', async () => {
@@ -292,7 +375,9 @@ $('track-page').addEventListener('click', async () => {
     return;
   }
   setOutput(`Tracked ${currentPage?.title || 'this page'}.`);
+  persistWorkspaceState({ lastAction: 'track-page' });
   await refreshTrackedPages();
+  await refreshPage();
 });
 
 $('save-note').addEventListener('click', async () => {
@@ -306,6 +391,8 @@ $('save-note').addEventListener('click', async () => {
     return;
   }
   setOutput('Page note saved.');
+  persistWorkspaceState({ lastAction: 'save-note' });
+  await refreshPage();
 });
 
 $('save-snapshot').addEventListener('click', async () => {
@@ -323,7 +410,9 @@ $('save-snapshot').addEventListener('click', async () => {
   } else {
     setOutput(`Snapshot saved for ${currentPage?.title || 'this page'}.`);
   }
+  persistWorkspaceState({ lastAction: 'save-snapshot' });
   await refreshSnapshots();
+  await refreshPage();
 });
 
 $('compare-snapshot').addEventListener('click', async () => {
@@ -441,17 +530,38 @@ $('tracked-pages').addEventListener('click', async (event) => {
   }
 });
 
+$('workspace-prompt').addEventListener('input', () => persistWorkspaceState());
+$('direct-prompt').addEventListener('input', () => persistWorkspaceState());
+$('workspace-target').addEventListener('change', () => persistWorkspaceState());
+
 $('tracked-search').addEventListener('input', (event) => {
   trackedSearch = String(event.target.value || '').trim().toLowerCase();
+  persistWorkspaceState();
   renderTrackedPages(trackedItems);
 });
 
 $('tracked-filter-toggle').addEventListener('click', () => {
   trackedPinnedOnly = !trackedPinnedOnly;
   $('tracked-filter-toggle').textContent = `Pinned Only: ${trackedPinnedOnly ? 'On' : 'Off'}`;
+  persistWorkspaceState();
   renderTrackedPages(trackedItems);
 });
 
-refreshPage().catch((error) => setOutput(error.message || String(error)));
-refreshHistory().catch((error) => setOutput(error.message || String(error)));
-refreshTrackedPages().catch((error) => setOutput(error.message || String(error)));
+async function initializeWorkspace() {
+  await restoreWorkspaceState();
+  await refreshPage();
+  await refreshHistory();
+  await refreshTrackedPages();
+}
+
+window.addEventListener('focus', () => {
+  refreshPage().catch((error) => setOutput(error.message || String(error)));
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    refreshPage().catch((error) => setOutput(error.message || String(error)));
+  }
+});
+
+initializeWorkspace().catch((error) => setOutput(error.message || String(error)));

@@ -11,7 +11,7 @@
       <header class="topbar">
         <div>
           <div class="eyebrow">Hermes Relay for Chrome</div>
-          <h1>Current page</h1>
+          <h1>Hermes Workspace</h1>
         </div>
         <button id="refresh-page" class="icon-btn" title="Refresh page context">↻</button>
       </header>
@@ -19,6 +19,8 @@
       <section class="panel page-panel">
         <div id="page-title" class="page-title">Loading page context…</div>
         <div id="page-meta" class="page-meta">Looking at the active tab</div>
+        <div id="page-continuity" class="continuity-banner new">Checking whether Hermes has seen this page before…</div>
+        <div id="page-memory-stats" class="continuity-stats"></div>
         <div id="page-headings" class="tag-list"></div>
         <div class="page-actions">
           <button id="track-page" class="secondary-btn">Track Page</button>
@@ -85,7 +87,7 @@
           </div>
           <div class="toolbar-actions">
             <button id="run-workflow" class="primary-btn">Run</button>
-            <button id="inject-workflow" class="secondary-btn">Inject</button>
+            <button id="inject-workflow" class="secondary-btn">Build + Insert Context</button>
           </div>
         </div>
       </section>
