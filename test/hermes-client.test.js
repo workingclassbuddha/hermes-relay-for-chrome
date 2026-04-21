@@ -32,7 +32,52 @@ test('checkHealth reports offline when fetch fails', async () => {
   });
 
   assert.equal(status.ok, false);
+  assert.equal(status.reachable, false);
   assert.match(status.message, /ECONNREFUSED/);
+});
+
+test('checkHealth falls back to localhost when the default loopback host is offline', async () => {
+  const client = createHermesClient({
+    fetchImpl: async (url) => {
+      if (String(url).startsWith('http://127.0.0.1:8642')) {
+        throw new Error('connect ECONNREFUSED');
+      }
+
+      return {
+        ok: true,
+        async json() {
+          return { status: 'ok' };
+        },
+      };
+    },
+  });
+
+  const status = await client.checkHealth({
+    baseUrl: 'http://127.0.0.1:8642',
+    apiKey: '',
+  });
+
+  assert.equal(status.ok, true);
+  assert.equal(status.baseUrl, 'http://localhost:8642');
+  assert.equal(status.suggestedBaseUrl, 'http://localhost:8642');
+});
+
+test('checkHealth reports authRequired when Hermes rejects the current key', async () => {
+  const client = createHermesClient({
+    fetchImpl: async () => ({
+      ok: false,
+      status: 401,
+    }),
+  });
+
+  const status = await client.checkHealth({
+    baseUrl: 'http://127.0.0.1:8642',
+    apiKey: 'wrong-key',
+  });
+
+  assert.equal(status.ok, false);
+  assert.equal(status.authRequired, true);
+  assert.equal(status.reachable, true);
 });
 
 test('callResponse returns parsed output text', async () => {

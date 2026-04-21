@@ -41,7 +41,7 @@
       <section class="panel">
         <div class="panel-head">
           <h2>Connect Once</h2>
-          <button id="save-config" class="primary-btn small">Connect</button>
+          <button id="save-config" class="primary-btn small">Save &amp; Test</button>
         </div>
         <label class="field">
           <span>Hermes API key</span>
@@ -59,6 +59,38 @@
             <input id="conversation-prefix" type="text" placeholder="hermes-relay">
           </label>
         </details>
+      </section>
+
+      <section class="panel setup-panel">
+        <div class="panel-head">
+          <h2>Get Started</h2>
+          <button id="copy-setup" class="ghost-btn">Copy Setup</button>
+        </div>
+        <div id="setup-summary" class="setup-summary">Looking for Hermes on your machine…</div>
+        <div class="setup-steps">
+          <div id="setup-step-server" class="setup-step todo">
+            <span class="setup-badge" aria-hidden="true"></span>
+            <div>
+              <div class="setup-title">Start Hermes locally</div>
+              <div class="setup-meta">Enable the Hermes API server and run <code>hermes gateway</code>.</div>
+            </div>
+          </div>
+          <div id="setup-step-key" class="setup-step todo">
+            <span class="setup-badge" aria-hidden="true"></span>
+            <div>
+              <div class="setup-title">Paste your API key once</div>
+              <div class="setup-meta">Use the same key that lives in <code>~/.hermes/.env</code>.</div>
+            </div>
+          </div>
+          <div id="setup-step-page" class="setup-step todo">
+            <span class="setup-badge" aria-hidden="true"></span>
+            <div>
+              <div class="setup-title">Open any page and try it</div>
+              <div class="setup-meta">Summarize, Ask Hermes, or Build Context from a normal web page.</div>
+            </div>
+          </div>
+        </div>
+        <pre id="setup-command" class="setup-command">Looking for a local Hermes server...</pre>
       </section>
 
       <section class="panel">

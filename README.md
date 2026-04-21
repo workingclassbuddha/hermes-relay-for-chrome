@@ -131,6 +131,14 @@ Default local API:
 http://127.0.0.1:8642
 ```
 
+From this repo, you can also run:
+
+```bash
+npm run setup:local
+```
+
+That local helper checks `~/.hermes/.env`, probes the common local Hermes API URLs, and prints the exact extension and zip paths you can load in Chrome.
+
 Official references:
 
 - [Hermes Agent](https://hermes-agent.nousresearch.com/)
@@ -152,19 +160,21 @@ Official references:
 ### 2. Connect Hermes Relay
 
 1. Open the Hermes Relay popup
-2. Paste your local Hermes API key
-3. Keep the default base URL unless you are intentionally using a different local server
-4. Click **Connect**
+2. Let the popup auto-detect your local Hermes server
+3. Paste your local Hermes API key
+4. Keep the detected base URL unless you are intentionally using a different local server
+5. Click **Save & Test**
 
 ### 3. Use it on a page
 
 A good first run looks like this:
 
 1. Open any article, app page, or thread
-2. Click **Summarize** or **Ask**
-3. Save a note or snapshot if the page matters later
-4. Open the **Workspace** side panel for continuity, notes, snapshots, and memory actions
-5. Use **Build Context** to create a handoff bundle, then **Insert Latest** on Claude, ChatGPT, or Gemini
+2. Follow the popup checklist until all three setup steps are green
+3. Click **Summarize** or **Ask**
+4. Save a note or snapshot if the page matters later
+5. Open the **Workspace** side panel for continuity, notes, snapshots, and memory actions
+6. Use **Build Context** to create a handoff bundle, then **Insert Latest** on Claude, ChatGPT, or Gemini
 
 ---
 

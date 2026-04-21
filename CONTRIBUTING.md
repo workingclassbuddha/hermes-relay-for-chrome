@@ -11,6 +11,7 @@ Thanks for helping with Hermes Relay.
 
 ```bash
 npm run check
+npm run setup:local
 ```
 
 ## Project Shape

@@ -387,6 +387,84 @@ summary:focus-visible {
   content: '−';
 }
 
+.setup-panel {
+  background:
+    radial-gradient(circle at top right, rgba(165, 186, 116, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(18, 24, 17, 0.96), rgba(10, 14, 10, 0.94));
+}
+
+.setup-summary {
+  margin-bottom: 12px;
+  color: #e7dccb;
+}
+
+.setup-steps {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.setup-step {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.setup-badge {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border-radius: 999px;
+  border: 1px solid rgba(118, 127, 104, 0.22);
+  background: rgba(118, 127, 104, 0.2);
+}
+
+.setup-step.done .setup-badge {
+  border-color: rgba(165, 186, 116, 0.44);
+  background: var(--good);
+  box-shadow: 0 0 0 4px rgba(165, 186, 116, 0.12);
+}
+
+.setup-step.current .setup-badge {
+  border-color: rgba(234, 219, 197, 0.44);
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(234, 219, 197, 0.08);
+}
+
+.setup-step.warning .setup-badge {
+  border-color: rgba(184, 132, 120, 0.4);
+  background: var(--bad);
+  box-shadow: 0 0 0 4px rgba(184, 132, 120, 0.08);
+}
+
+.setup-title {
+  font-weight: 600;
+}
+
+.setup-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.setup-meta code,
+.setup-command {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.setup-command {
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(118, 127, 104, 0.16);
+  background: rgba(6, 11, 10, 0.92);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #dfd3c2;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .hint-panel {
   background:
     radial-gradient(circle at top right, rgba(165, 186, 116, 0.12), transparent 34%),

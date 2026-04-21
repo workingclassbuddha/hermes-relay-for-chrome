@@ -6,6 +6,11 @@ export const DEFAULT_CONFIG = {
   preferredTarget: 'auto',
 };
 
+export const LOCAL_HERMES_BASE_URLS = [
+  DEFAULT_CONFIG.baseUrl,
+  'http://localhost:8642',
+];
+
 export const HEALTH_TIMEOUT_MS = 4000;
 export const RESPONSE_TIMEOUT_MS = 45000;
 export const STORAGE_SCHEMA_VERSION = 1;

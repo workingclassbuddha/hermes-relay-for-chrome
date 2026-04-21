@@ -1,6 +1,7 @@
 'use strict';
 
 const $ = (id) => document.getElementById(id);
+let latestSetupText = '';
 
 function setOutput(text) {
   $('output').textContent = text || 'No output yet.';
@@ -51,26 +52,218 @@ async function sendMessage(message) {
   return chrome.runtime.sendMessage(message);
 }
 
+function getEffectiveBaseUrl(health = {}, config = {}) {
+  return health.detectedBaseUrl || health.baseUrl || config.baseUrl || 'http://127.0.0.1:8642';
+}
+
+function deriveSetupState(payload = {}, pageResponse = {}) {
+  const health = payload.health || {};
+  const config = payload.config || {};
+  const hasApiKey = Boolean(String(config.apiKey || '').trim());
+  const effectiveBaseUrl = getEffectiveBaseUrl(health, config);
+  const serverReachable = Boolean(health.ok || health.authRequired || health.reachable);
+  const pageReady = Boolean(pageResponse?.ok);
+  const keyNeedsAttention = Boolean(health.authRequired && hasApiKey);
+  const ready = Boolean(health.ok && hasApiKey);
+  const suggestedKey = $('api-key')?.value.trim() || config.apiKey || 'change-me-local-dev';
+
+  if (!serverReachable) {
+    return {
+      hasApiKey,
+      serverReachable,
+      pageReady,
+      keyNeedsAttention,
+      ready,
+      effectiveBaseUrl,
+      summary: 'Start Hermes locally, then paste your API key once.',
+      commandText: [
+        'Add to ~/.hermes/.env:',
+        'API_SERVER_ENABLED=true',
+        `API_SERVER_KEY=${suggestedKey}`,
+        '',
+        'Then run:',
+        'hermes gateway',
+      ].join('\n'),
+    };
+  }
+
+  if (!hasApiKey) {
+    return {
+      hasApiKey,
+      serverReachable,
+      pageReady,
+      keyNeedsAttention,
+      ready,
+      effectiveBaseUrl,
+      summary: `Hermes is running at ${effectiveBaseUrl}. Paste your API key once to finish setup.`,
+      commandText: [
+        `Hermes detected at ${effectiveBaseUrl}.`,
+        '',
+        'Next:',
+        '1. Paste the API key from ~/.hermes/.env into this popup',
+        '2. Click Save & Test',
+      ].join('\n'),
+    };
+  }
+
+  if (keyNeedsAttention) {
+    return {
+      hasApiKey,
+      serverReachable,
+      pageReady,
+      keyNeedsAttention,
+      ready,
+      effectiveBaseUrl,
+      summary: 'Hermes responded, but the saved API key needs attention.',
+      commandText: [
+        `Hermes detected at ${effectiveBaseUrl}.`,
+        '',
+        'Check ~/.hermes/.env:',
+        'API_SERVER_ENABLED=true',
+        `API_SERVER_KEY=${suggestedKey}`,
+        '',
+        'Then click Save & Test again.',
+      ].join('\n'),
+    };
+  }
+
+  if (!pageReady) {
+    return {
+      hasApiKey,
+      serverReachable,
+      pageReady,
+      keyNeedsAttention,
+      ready,
+      effectiveBaseUrl,
+      summary: 'Hermes Relay is connected. Open a normal website tab to start using it.',
+      commandText: [
+        `Connected at ${effectiveBaseUrl}.`,
+        '',
+        'Next:',
+        '1. Open any article, app page, or thread',
+        '2. Come back here and click Summarize Page or Ask Hermes',
+      ].join('\n'),
+    };
+  }
+
+  return {
+    hasApiKey,
+    serverReachable,
+    pageReady,
+    keyNeedsAttention,
+    ready,
+    effectiveBaseUrl,
+    summary: 'Hermes Relay is ready. Summarize, ask, or build context from this page.',
+    commandText: [
+      `Connected at ${effectiveBaseUrl}.`,
+      '',
+      'Good first run:',
+      '1. Click Summarize Page',
+      '2. Open the Workspace for notes, snapshots, and continuity',
+      '3. Build Context, then Insert Latest in Claude, ChatGPT, or Gemini',
+    ].join('\n'),
+  };
+}
+
 function renderStatus(payload) {
   const health = payload.health || {};
   const config = payload.config || {};
+  const hasApiKey = Boolean(String(config.apiKey || '').trim());
+  const serverReachable = Boolean(health.ok || health.authRequired || health.reachable);
+  const effectiveBaseUrl = getEffectiveBaseUrl(health, config);
 
-  $('base-url').value = config.baseUrl || '';
+  $('base-url').value = effectiveBaseUrl;
   $('api-key').value = config.apiKey || '';
   $('conversation-prefix').value = config.conversationPrefix || 'hermes-relay';
 
   const dot = $('status-dot');
   dot.classList.remove('ok', 'offline');
-  dot.classList.add(health.ok ? 'ok' : 'offline');
-  $('status-label').textContent = health.ok ? 'Connected to Hermes' : 'Not connected yet';
-  $('status-meta').textContent = health.ok
-    ? `Ready at ${health.baseUrl || config.baseUrl}`
-    : (config.apiKey
-      ? 'Hermes was not reachable on your machine. Start Hermes, then refresh.'
-      : 'Paste your Hermes API key once, then connect.');
+  dot.classList.add(serverReachable ? 'ok' : 'offline');
+
+  if (health.ok && hasApiKey) {
+    $('status-label').textContent = 'Connected to Hermes';
+    $('status-meta').textContent = `Ready at ${effectiveBaseUrl}`;
+    return;
+  }
+
+  if (health.authRequired && hasApiKey) {
+    $('status-label').textContent = 'Hermes needs the right API key';
+    $('status-meta').textContent = `Hermes responded at ${effectiveBaseUrl}. Save the correct key and test again.`;
+    return;
+  }
+
+  if (serverReachable && !hasApiKey) {
+    $('status-label').textContent = 'Hermes found locally';
+    $('status-meta').textContent = `Detected at ${effectiveBaseUrl}. Paste your API key once to finish setup.`;
+    return;
+  }
+
+  if (serverReachable) {
+    $('status-label').textContent = 'Hermes is responding';
+    $('status-meta').textContent = health.message || `Hermes responded at ${effectiveBaseUrl}.`;
+    return;
+  }
+
+  if (hasApiKey) {
+    $('status-label').textContent = 'Start Hermes locally';
+    $('status-meta').textContent = 'Run hermes gateway, then refresh or Save & Test again.';
+    return;
+  }
+
+  $('status-label').textContent = 'Hermes not running yet';
+  $('status-meta').textContent = 'Enable the Hermes API server, run hermes gateway, then paste your API key.';
 }
 
-function renderPage(response) {
+function setSetupStep(id, state, text) {
+  const step = $(id);
+  if (!step) return;
+  step.classList.remove('done', 'current', 'warning', 'todo');
+  step.classList.add(state);
+  const meta = step.querySelector('.setup-meta');
+  if (meta) {
+    meta.textContent = text;
+  }
+}
+
+function renderSetupGuide(payload, pageResponse) {
+  const setup = deriveSetupState(payload, pageResponse);
+  latestSetupText = setup.commandText;
+
+  $('setup-summary').textContent = setup.summary;
+  $('setup-command').textContent = setup.commandText;
+
+  if (setup.serverReachable) {
+    setSetupStep('setup-step-server', 'done', `Hermes detected at ${setup.effectiveBaseUrl}.`);
+  } else {
+    setSetupStep('setup-step-server', 'current', 'Enable the Hermes API server and run hermes gateway.');
+  }
+
+  if (!setup.hasApiKey) {
+    setSetupStep(
+      'setup-step-key',
+      setup.serverReachable ? 'current' : 'todo',
+      'Paste the same API key from ~/.hermes/.env into this popup.',
+    );
+  } else if (setup.keyNeedsAttention) {
+    setSetupStep('setup-step-key', 'warning', 'The saved API key needs attention. Save the correct key and test again.');
+  } else {
+    setSetupStep('setup-step-key', 'done', 'API key saved in Hermes Relay.');
+  }
+
+  if (setup.pageReady) {
+    setSetupStep('setup-step-page', 'done', 'This page is ready for Summarize, Ask Hermes, and Build Context.');
+  } else {
+    setSetupStep(
+      'setup-step-page',
+      setup.ready ? 'current' : 'todo',
+      'Open a normal website tab, then click Summarize Page or Ask Hermes.',
+    );
+  }
+
+  return setup;
+}
+
+function renderPage(response, readyToUse = false) {
   if (!response?.ok) {
     setPageActionAvailability(false);
     $('page-title').textContent = 'No active page found';
@@ -81,7 +274,7 @@ function renderPage(response) {
     return;
   }
 
-  setPageActionAvailability(true);
+  setPageActionAvailability(Boolean(readyToUse));
   const { page, tab, continuity } = response;
   $('page-title').textContent = page?.title || tab?.title || 'Untitled page';
   $('page-meta').textContent = [page?.hostname, page?.pageType, page?.url].filter(Boolean).join(' · ');
@@ -123,7 +316,8 @@ async function refreshAll() {
     useActivePage: !page?.page?.url && !page?.tab?.url,
   });
   renderStatus(status);
-  renderPage(page);
+  const setup = renderSetupGuide(status, page);
+  renderPage(page, setup.ready);
   renderHandoff(handoff);
   $('ask-prompt').value = workspace.workspaceState?.prompt || '';
   setOutput(workspace.workspaceState?.output || 'Hermes responses will appear here.');
@@ -180,6 +374,29 @@ $('save-config').addEventListener('click', async () => {
 $('refresh-status').addEventListener('click', refreshAll);
 $('open-workspace').addEventListener('click', openWorkspace);
 $('open-workspace-cta').addEventListener('click', openWorkspace);
+$('copy-setup').addEventListener('click', async () => {
+  const apiKey = $('api-key').value.trim() || 'change-me-local-dev';
+  const baseUrl = $('base-url').value.trim() || 'http://127.0.0.1:8642';
+  const text = [
+    'Hermes Relay local setup',
+    '',
+    '1. Add to ~/.hermes/.env:',
+    'API_SERVER_ENABLED=true',
+    `API_SERVER_KEY=${apiKey}`,
+    '',
+    '2. Start Hermes:',
+    'hermes gateway',
+    '',
+    '3. In the Hermes Relay popup:',
+    `Base URL: ${baseUrl}`,
+    `API key: ${apiKey}`,
+    '',
+    latestSetupText,
+  ].filter(Boolean).join('\n');
+
+  await navigator.clipboard.writeText(text);
+  setOutput('Copied Hermes setup steps to the clipboard.');
+});
 
 $('ask-prompt').addEventListener('input', async () => {
   await saveWorkspacePatch({ prompt: $('ask-prompt').value });
