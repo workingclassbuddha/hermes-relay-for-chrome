@@ -1,5 +1,15 @@
 import { findLatestContextAction, describeLatestContext } from './handoff.js';
-import { escapeHtml, buildConversationId, canonicalizeUrl, hashString, inferAssistantTarget, isSupportedChatUrl, summarizeNote } from '../shared/utils.js';
+import {
+  escapeHtml,
+  buildConversationId,
+  canonicalizeUrl,
+  hashString,
+  inferAssistantTarget,
+  isSupportedChatUrl,
+  summarizeNote,
+  getHostname,
+  isKnownAssistantHost,
+} from '../shared/utils.js';
 
 export function getModeDefinition(mode) {
   const table = {
@@ -179,7 +189,7 @@ export function createRelayOperations({
   storageApi,
   pageContextApi,
   hermesClient,
-  getConfig = () => storageApi.getConfig(),
+  getConfig = async () => (typeof storageApi.getConfig === 'function' ? storageApi.getConfig() : {}),
   browser = globalThis.chrome,
   uuid = () => crypto.randomUUID(),
   now = () => new Date().toISOString(),
@@ -491,16 +501,27 @@ export function createRelayOperations({
   }
 
   async function getLatestContextStatus() {
-    const [recentActions, activeTab] = await Promise.all([
+    const [recentActions, activeTab, config] = await Promise.all([
       storageApi.getRecentActions(),
       pageContextApi.getActiveTab(),
+      getConfig(),
     ]);
     const item = findLatestContextAction(recentActions);
+    const activeHostname = getHostname(activeTab?.url || '');
+    const customAssistantHosts = config?.customAssistantHosts || [];
+    const canInsertHere = isSupportedChatUrl(activeTab?.url || '', customAssistantHosts);
 
     return {
       ...describeLatestContext(item),
-      canInsertHere: isSupportedChatUrl(activeTab?.url || ''),
-      activeTarget: inferAssistantTarget(activeTab?.url || ''),
+      canInsertHere,
+      activeTarget: inferAssistantTarget(activeTab?.url || '', customAssistantHosts),
+      activeHostname,
+      canAllowCurrentHost: Boolean(
+        activeHostname
+        && !canInsertHere
+        && !pageContextApi.isRestrictedBrowserUrl(activeTab?.url || '')
+        && !isKnownAssistantHost(activeHostname),
+      ),
       item,
     };
   }
@@ -573,16 +594,19 @@ export function createRelayOperations({
 
   async function injectIntoActiveTab(text) {
     const activeTab = await pageContextApi.getActiveTab();
+    const config = await getConfig();
+    const customAssistantHosts = config?.customAssistantHosts || [];
     if (!activeTab?.id) {
       throw new Error('No active tab available.');
     }
     if (pageContextApi.isRestrictedBrowserUrl(activeTab?.url || '')) {
       throw new Error('Hermes Relay cannot insert context into browser-internal pages like chrome:// tabs.');
     }
-    if (!isSupportedChatUrl(activeTab?.url || '')) {
-      throw new Error('Open Claude, ChatGPT, or Gemini, then insert the latest Hermes context there.');
+    if (!isSupportedChatUrl(activeTab?.url || '', customAssistantHosts)) {
+      throw new Error('Open a supported AI chat or allow this site as a custom AI host first.');
     }
 
+    await pageContextApi.ensureChatBridge(activeTab.id);
     const reply = await browser.tabs.sendMessage(activeTab.id, {
       type: 'INSERT_HERMES_CONTEXT',
       text,
@@ -600,6 +624,30 @@ export function createRelayOperations({
     });
 
     return reply;
+  }
+
+  async function addCustomAssistantHost(url = '') {
+    const hostname = getHostname(url);
+    if (!hostname) {
+      throw new Error('No valid hostname found for this page.');
+    }
+
+    if (isKnownAssistantHost(hostname)) {
+      return {
+        ok: true,
+        hostname,
+        config: await getConfig(),
+      };
+    }
+
+    const config = await getConfig();
+    return {
+      ok: true,
+      hostname,
+      config: await storageApi.setConfig({
+        customAssistantHosts: [...(config.customAssistantHosts || []), hostname],
+      }),
+    };
   }
 
   async function openContextResult(text, label) {
@@ -659,6 +707,7 @@ export function createRelayOperations({
     insertLatestContext,
     compareWithLatestSnapshot,
     injectIntoActiveTab,
+    addCustomAssistantHost,
     openContextResult,
     openSidePanel,
   };

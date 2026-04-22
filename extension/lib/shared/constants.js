@@ -4,6 +4,7 @@ export const DEFAULT_CONFIG = {
   model: 'hermes-agent',
   conversationPrefix: 'hermes-relay',
   preferredTarget: 'auto',
+  customAssistantHosts: [],
 };
 
 export const LOCAL_HERMES_BASE_URLS = [

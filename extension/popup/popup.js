@@ -385,18 +385,32 @@ function renderPage(response, readyToUse = false) {
 function renderHandoff(response) {
   const handoff = response?.handoff || {};
   const insertButton = $('insert-latest');
+  const allowButton = $('allow-current-host');
   const canInsert = Boolean(handoff.available && handoff.canInsertHere);
   if (insertButton) {
     insertButton.disabled = !canInsert;
   }
+  if (allowButton) {
+    allowButton.hidden = !handoff.canAllowCurrentHost;
+    allowButton.textContent = handoff.activeHostname
+      ? `Allow ${handoff.activeHostname}`
+      : 'Allow This AI Site';
+  }
 
   if (!handoff.available) {
-    $('handoff-status').textContent = 'Build context from a page before inserting it into a chat.';
+    $('handoff-status').textContent = handoff.canAllowCurrentHost
+      ? `Hermes can route into ${handoff.activeHostname}. Allow this host first, then build context from a page.`
+      : 'Build context from a page before inserting it into a chat.';
+    return;
+  }
+
+  if (handoff.canAllowCurrentHost) {
+    $('handoff-status').textContent = `Latest context is ready. Allow ${handoff.activeHostname} to route Hermes into this site.`;
     return;
   }
 
   if (!handoff.canInsertHere) {
-    $('handoff-status').textContent = `Latest context ready from ${handoff.title || 'a recent page'}. Switch to Claude, ChatGPT, or Gemini to insert it.`;
+    $('handoff-status').textContent = `Latest context ready from ${handoff.title || 'a recent page'}. Switch to a supported or allowed AI chat to insert it.`;
     return;
   }
 
@@ -474,6 +488,16 @@ $('save-config').addEventListener('click', async () => {
 $('refresh-status').addEventListener('click', refreshAll);
 $('open-workspace').addEventListener('click', openWorkspace);
 $('open-workspace-cta').addEventListener('click', openWorkspace);
+$('allow-current-host').addEventListener('click', async () => {
+  const response = await sendMessage({ type: 'ALLOW_CURRENT_AI_HOST' });
+  if (!response.ok) {
+    setOutput(response.error || 'Could not allow this host.');
+    return;
+  }
+
+  setOutput(`Allowed ${response.hostname} as a custom AI host for Hermes routing.`);
+  await refreshAll();
+});
 $('copy-setup').addEventListener('click', async () => {
   const baseUrl = $('base-url').value.trim() || 'http://127.0.0.1:8642';
   const text = [

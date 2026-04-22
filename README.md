@@ -175,7 +175,9 @@ A good first run looks like this:
 3. Click **Summarize** or **Ask**
 4. Save a note or snapshot if the page matters later
 5. Open the **Workspace** side panel for continuity, notes, snapshots, and memory actions
-6. Use **Build Context** to create a handoff bundle, then **Insert Latest** on Claude, ChatGPT, or Gemini
+6. Use **Build Context** to create a handoff bundle, then **Insert Latest** on Claude, ChatGPT, Gemini, or an allowed custom AI site
+
+You can also allow another AI website from the popup. Open the target site, click **Allow This AI Site**, then use **Insert Latest** there with your existing browser session.
 
 ---
 

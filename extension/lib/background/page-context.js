@@ -74,7 +74,15 @@ export function createPageContextApi({
     return result;
   }
 
+  async function ensureChatBridge(tabId) {
+    await scripting.executeScript({
+      target: { tabId },
+      files: ['content/chat.js'],
+    });
+  }
+
   return {
+    ensureChatBridge,
     getActiveTab,
     isRestrictedBrowserUrl,
     unsupportedPageMessage,

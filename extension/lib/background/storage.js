@@ -7,6 +7,7 @@ import {
 import {
   canonicalizeUrl,
   normalizeBaseUrl,
+  normalizeAssistantHosts,
   parseIsoTime,
   summarizeNote,
 } from '../shared/utils.js';
@@ -180,6 +181,7 @@ export function migrateStorageRecord(data = {}, {
     conversationPrefix: String(data.conversationPrefix || DEFAULT_CONFIG.conversationPrefix).trim()
       || DEFAULT_CONFIG.conversationPrefix,
     preferredTarget: String(data.preferredTarget || DEFAULT_CONFIG.preferredTarget),
+    customAssistantHosts: normalizeAssistantHosts(data.customAssistantHosts || DEFAULT_CONFIG.customAssistantHosts),
     workspaceState: globalWorkspaceState,
     workspaceStateGlobal: globalWorkspaceState,
     workspaceStateByPage: normalizeWorkspaceStateByPage(data.workspaceStateByPage || {}),
@@ -221,6 +223,7 @@ export function createStorageApi({
       baseUrl: normalizeBaseUrl(String(data.baseUrl || DEFAULT_CONFIG.baseUrl).trim()),
       conversationPrefix: String(data.conversationPrefix || DEFAULT_CONFIG.conversationPrefix).trim()
         || DEFAULT_CONFIG.conversationPrefix,
+      customAssistantHosts: normalizeAssistantHosts(data.customAssistantHosts || DEFAULT_CONFIG.customAssistantHosts),
     };
   }
 
@@ -235,6 +238,9 @@ export function createStorageApi({
     if ('conversationPrefix' in nextPatch) {
       nextPatch.conversationPrefix = String(nextPatch.conversationPrefix || DEFAULT_CONFIG.conversationPrefix).trim()
         || DEFAULT_CONFIG.conversationPrefix;
+    }
+    if ('customAssistantHosts' in nextPatch) {
+      nextPatch.customAssistantHosts = normalizeAssistantHosts(nextPatch.customAssistantHosts);
     }
 
     await storage.set(nextPatch);

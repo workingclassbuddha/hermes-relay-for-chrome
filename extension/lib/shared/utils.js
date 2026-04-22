@@ -1,5 +1,22 @@
 import { DEFAULT_CONFIG } from './constants.js';
 
+const KNOWN_ASSISTANT_HOSTS = new Map([
+  ['claude.ai', 'claude'],
+  ['chatgpt.com', 'chatgpt'],
+  ['chat.openai.com', 'chatgpt'],
+  ['gemini.google.com', 'gemini'],
+  ['perplexity.ai', 'perplexity'],
+  ['poe.com', 'poe'],
+  ['grok.com', 'grok'],
+  ['x.ai', 'grok'],
+  ['deepseek.com', 'deepseek'],
+  ['chat.deepseek.com', 'deepseek'],
+  ['mistral.ai', 'mistral'],
+  ['chat.mistral.ai', 'mistral'],
+  ['you.com', 'you'],
+  ['openrouter.ai', 'openrouter'],
+]);
+
 export function canonicalizeUrl(url) {
   try {
     const parsed = new URL(String(url || ''));
@@ -43,16 +60,60 @@ export function summarizeNote(text, limit = 160) {
   return compact.length > limit ? `${compact.slice(0, limit - 1)}...` : compact;
 }
 
-export function inferAssistantTarget(url) {
-  const raw = String(url || '').toLowerCase();
-  if (raw.includes('claude.ai')) return 'claude';
-  if (raw.includes('chatgpt.com') || raw.includes('chat.openai.com')) return 'chatgpt';
-  if (raw.includes('gemini.google.com')) return 'gemini';
+export function normalizeHostname(hostname) {
+  return String(hostname || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\.+|\.+$/g, '');
+}
+
+export function getHostname(url) {
+  try {
+    return normalizeHostname(new URL(String(url || '')).hostname);
+  } catch (_) {
+    return '';
+  }
+}
+
+export function normalizeAssistantHosts(hosts = []) {
+  return [...new Set(
+    (Array.isArray(hosts) ? hosts : [])
+      .map((host) => normalizeHostname(host))
+      .filter(Boolean),
+  )];
+}
+
+export function isKnownAssistantHost(hostname = '') {
+  const normalized = normalizeHostname(hostname);
+  for (const knownHost of KNOWN_ASSISTANT_HOSTS.keys()) {
+    if (normalized === knownHost || normalized.endsWith(`.${knownHost}`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function resolveAssistantTarget(hostname = '', customHosts = []) {
+  const normalized = normalizeHostname(hostname);
+  for (const [knownHost, target] of KNOWN_ASSISTANT_HOSTS.entries()) {
+    if (normalized === knownHost || normalized.endsWith(`.${knownHost}`)) {
+      return target;
+    }
+  }
+
+  if (normalizeAssistantHosts(customHosts).includes(normalized)) {
+    return 'custom';
+  }
+
   return 'generic';
 }
 
-export function isSupportedChatUrl(url) {
-  return inferAssistantTarget(url) !== 'generic';
+export function inferAssistantTarget(url, customHosts = []) {
+  return resolveAssistantTarget(getHostname(url), customHosts);
+}
+
+export function isSupportedChatUrl(url, customHosts = []) {
+  return inferAssistantTarget(url, customHosts) !== 'generic';
 }
 
 export function buildConversationId(config, suffix) {

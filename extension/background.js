@@ -10,6 +10,41 @@ const storageApi = createStorageApi();
 const pageContextApi = createPageContextApi();
 const hermesClient = createHermesClient();
 const readStoredConfig = storageApi.getConfig.bind(storageApi);
+const permissionsApi = globalThis.chrome?.permissions;
+
+function getOriginPattern(url = '') {
+  try {
+    const parsed = new URL(String(url || ''));
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return '';
+    }
+    return `${parsed.protocol}//${parsed.hostname}/*`;
+  } catch (_) {
+    return '';
+  }
+}
+
+async function requestSitePermission(url = '') {
+  const origin = getOriginPattern(url);
+  if (!origin) {
+    throw new Error('Open a normal website tab before allowing it as an AI host.');
+  }
+
+  if (!permissionsApi?.request || !permissionsApi?.contains) {
+    return origin;
+  }
+
+  if (await permissionsApi.contains({ origins: [origin] })) {
+    return origin;
+  }
+
+  const granted = await permissionsApi.request({ origins: [origin] });
+  if (!granted) {
+    throw new Error(`Hermes needs permission for ${origin} before it can route into this site.`);
+  }
+
+  return origin;
+}
 
 async function syncLocalDevConfig() {
   const [config, localDevConfig] = await Promise.all([
@@ -254,6 +289,8 @@ async function messageGetHandoffStatus() {
       type: status.type,
       canInsertHere: status.canInsertHere,
       activeTarget: status.activeTarget,
+      activeHostname: status.activeHostname,
+      canAllowCurrentHost: status.canAllowCurrentHost,
     },
   };
 }
@@ -430,6 +467,15 @@ const messageHandlers = {
     return {
       ok: true,
       ...(await operations.insertLatestContext()),
+    };
+  },
+
+  async ALLOW_CURRENT_AI_HOST() {
+    const activeTab = await pageContextApi.getActiveTab();
+    await requestSitePermission(activeTab?.url || '');
+    return {
+      ok: true,
+      ...(await operations.addCustomAssistantHost(activeTab?.url || '')),
     };
   },
 

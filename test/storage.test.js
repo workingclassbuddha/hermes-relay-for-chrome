@@ -99,11 +99,13 @@ test('createStorageApi ensures schema and normalizes config updates', async () =
   await api.setConfig({
     baseUrl: 'http://127.0.0.1:8642///',
     conversationPrefix: '  hermes-relay  ',
+    customAssistantHosts: ['Poe.com', 'poe.com', ' beta.example.ai '],
   });
 
   const config = await api.getConfig();
   assert.equal(config.baseUrl, 'http://127.0.0.1:8642');
   assert.equal(config.conversationPrefix, 'hermes-relay');
+  assert.deepEqual(config.customAssistantHosts, ['poe.com', 'beta.example.ai']);
 
   const data = storage.dump();
   assert.equal(data.storageSchemaVersion, STORAGE_SCHEMA_VERSION);
