@@ -36,6 +36,10 @@
             <div id="status-meta" class="status-meta">Looking for Hermes on your machine</div>
           </div>
         </div>
+        <div id="live-session-card" class="live-session-card detached">
+          <div id="live-session-label" class="live-session-label">Standalone relay mode</div>
+          <div id="live-session-detail" class="live-session-detail">No live terminal session attached yet.</div>
+        </div>
       </section>
 
       <section class="panel">
@@ -104,6 +108,10 @@
         <div id="page-title" class="recent-title">Loading page…</div>
         <div id="page-meta" class="recent-meta">Looking at the active tab</div>
         <div id="page-continuity" class="continuity-banner new">Checking whether Hermes has seen this page before…</div>
+        <div id="page-scope-card" class="scope-card">
+          <div id="page-scope-label" class="scope-label">Readable page</div>
+          <div id="page-scope-detail" class="scope-detail">Quick actions will use the readable page body and page metadata.</div>
+        </div>
       </section>
 
       <section class="panel">
@@ -111,11 +119,13 @@
           <h2>Quick Actions</h2>
         </div>
         <label class="field">
-          <span>Optional prompt</span>
+          <span>Optional instruction</span>
           <textarea id="ask-prompt" rows="3" placeholder="What matters here? What changed? What should I do next?"></textarea>
         </label>
         <div class="button-grid compact-grid">
-          <button id="summarize-page" class="primary-btn">Summarize Page</button>
+          <button id="explain-selection" class="primary-btn">Explain Selection</button>
+          <button id="summarize-page" class="secondary-btn">Summarize Page</button>
+          <button id="extract-facts" class="secondary-btn">Extract Facts</button>
           <button id="ask-page" class="secondary-btn">Ask Hermes</button>
           <button id="build-context" class="secondary-btn">Build Context</button>
           <button id="insert-latest" class="secondary-btn">Insert Latest</button>
@@ -131,6 +141,27 @@
           <div class="output-actions">
             <button id="copy-output" class="ghost-btn">Copy</button>
           </div>
+        </div>
+        <div id="result-meta-card" class="result-meta-card empty">
+          <div class="result-meta-grid">
+            <div class="result-meta-row">
+              <span class="result-meta-key">Mode</span>
+              <span id="result-mode" class="result-meta-value">No run yet</span>
+            </div>
+            <div class="result-meta-row">
+              <span class="result-meta-key">Scope</span>
+              <span id="result-scope" class="result-meta-value">Readable page</span>
+            </div>
+            <div class="result-meta-row">
+              <span class="result-meta-key">Destination</span>
+              <span id="result-destination" class="result-meta-value">Popup and workspace</span>
+            </div>
+            <div class="result-meta-row">
+              <span class="result-meta-key">Status</span>
+              <span id="result-status" class="result-meta-value">Idle</span>
+            </div>
+          </div>
+          <div id="result-provenance" class="result-provenance">Run a quick action to see exactly what Hermes used.</div>
         </div>
         <pre id="output" class="output">Hermes responses will appear here.</pre>
       </section>

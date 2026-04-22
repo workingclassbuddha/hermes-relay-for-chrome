@@ -2,18 +2,61 @@
 
 const $ = (id) => document.getElementById(id);
 let latestSetupText = '';
+let currentPage = null;
+let currentLiveSession = null;
 
 function setOutput(text) {
   $('output').textContent = text || 'No output yet.';
 }
 
-function setPageActionAvailability(enabled) {
-  ['summarize-page', 'ask-page', 'build-context'].forEach((id) => {
+function deriveScope(page = {}) {
+  if (String(page?.selection || '').trim()) return 'Selection first';
+  if (page?.pageType === 'article') return 'Visible article';
+  if (String(page?.text || '').trim()) return page?.pageType === 'app' ? 'Visible app surface' : 'Readable page';
+  return 'Page metadata';
+}
+
+function listInputs(page = {}) {
+  const inputs = ['page title', 'URL'];
+  if (String(page?.selection || '').trim()) inputs.push('selected text');
+  if (String(page?.description || '').trim()) inputs.push('description');
+  if (Array.isArray(page?.headings) && page.headings.length) inputs.push('visible headings');
+  if (String(page?.text || '').trim()) inputs.push(page?.pageType === 'article' ? 'article body' : 'readable page body');
+  return inputs;
+}
+
+function buildPlannedMeta(modeLabel) {
+  const inputs = listInputs(currentPage);
+  return {
+    modeLabel,
+    scopeLabel: deriveScope(currentPage),
+    destinationLabel: currentLiveSession ? 'Current terminal session' : 'Popup and workspace',
+    statusLabel: 'Running',
+    provenanceText: inputs.length ? `Using ${inputs.join(' + ')}` : 'Preparing browser context.',
+  };
+}
+
+function renderResultMeta(meta = null) {
+  const card = $('result-meta-card');
+  const next = meta && typeof meta === 'object' ? meta : null;
+  card.classList.toggle('empty', !next);
+  $('result-mode').textContent = next?.modeLabel || 'No run yet';
+  $('result-scope').textContent = next?.scopeLabel || 'Readable page';
+  $('result-destination').textContent = next?.destinationLabel || 'Popup and workspace';
+  $('result-status').textContent = next?.statusLabel || 'Idle';
+  $('result-provenance').textContent = next?.provenanceText || 'Run a quick action to see exactly what Hermes used.';
+}
+
+function setPageActionAvailability(enabled, { hasSelection = false } = {}) {
+  ['explain-selection', 'summarize-page', 'extract-facts', 'ask-page', 'build-context'].forEach((id) => {
     const button = $(id);
     if (button) {
       button.disabled = !enabled;
     }
   });
+  if ($('explain-selection')) {
+    $('explain-selection').disabled = !enabled || !hasSelection;
+  }
   $('ask-prompt').disabled = !enabled;
 }
 
@@ -362,24 +405,59 @@ function renderConfigSource(payload) {
   $('config-source-detail').textContent = `Saved in this browser · Base URL ${effectiveBaseUrl}`;
 }
 
+function renderLiveSession(payload = {}) {
+  const live = payload.liveSession || {};
+  const session = live.session || null;
+  currentLiveSession = live.ok && session ? session : null;
+  const card = $('live-session-card');
+  const label = $('live-session-label');
+  const detail = $('live-session-detail');
+  if (!card || !label || !detail) return;
+
+  card.classList.toggle('attached', Boolean(live.ok && session));
+  card.classList.toggle('detached', !Boolean(live.ok && session));
+
+  if (live.ok && session) {
+    label.textContent = 'Attached to live terminal session';
+    detail.textContent = [
+      session.session_title || session.session_id || 'Live session',
+      session.session_id || '',
+    ].filter(Boolean).join(' · ');
+    return;
+  }
+
+  label.textContent = 'Standalone relay mode';
+  detail.textContent = 'No live terminal session attached yet. Run /live on in Hermes to share this session.';
+}
+
 function renderPage(response, readyToUse = false) {
   if (!response?.ok) {
+    currentPage = null;
     setPageActionAvailability(false);
     $('page-title').textContent = 'No active page found';
     $('page-meta').textContent = 'Open a normal website tab to use Hermes Relay.';
     $('page-continuity').textContent = response?.error || 'Hermes could not inspect the active tab.';
     $('page-continuity').classList.remove('seen');
     $('page-continuity').classList.add('new');
+    $('page-scope-label').textContent = 'Page unavailable';
+    $('page-scope-detail').textContent = 'Quick actions need a normal website tab with readable content.';
     return;
   }
 
-  setPageActionAvailability(Boolean(readyToUse));
+  currentPage = response.page || null;
+  setPageActionAvailability(Boolean(readyToUse), {
+    hasSelection: Boolean(String(response.page?.selection || '').trim()),
+  });
   const { page, tab, continuity } = response;
   $('page-title').textContent = page?.title || tab?.title || 'Untitled page';
   $('page-meta').textContent = [page?.hostname, page?.pageType, page?.url].filter(Boolean).join(' · ');
   $('page-continuity').innerHTML = escapeHtml(continuity?.message || 'Hermes has not seen this page yet.');
   $('page-continuity').classList.toggle('seen', Boolean(continuity?.seenBefore));
   $('page-continuity').classList.toggle('new', !continuity?.seenBefore);
+  $('page-scope-label').textContent = deriveScope(page);
+  $('page-scope-detail').textContent = page?.selection
+    ? 'Selection detected. Explain Selection and the other quick actions will prioritize the selected text first.'
+    : 'No selection detected. Quick actions will use the readable page body and page metadata.';
 }
 
 function renderHandoff(response) {
@@ -430,11 +508,13 @@ async function refreshAll() {
   });
   renderStatus(status);
   renderConfigSource(status);
+  renderLiveSession(status);
   const setup = renderSetupGuide(status, page);
   renderPage(page, setup.ready);
   renderHandoff(handoff);
   $('ask-prompt').value = workspace.workspaceState?.prompt || '';
   setOutput(workspace.workspaceState?.output || 'Hermes responses will appear here.');
+  renderResultMeta(workspace.workspaceState?.outputMeta || null);
 }
 
 async function openWorkspace() {
@@ -449,8 +529,9 @@ async function saveWorkspacePatch(patch) {
   });
 }
 
-async function runAction(buttonId, busyLabel, fn) {
+async function runAction(buttonId, busyLabel, pendingMeta, fn) {
   setBusy(buttonId, busyLabel, true);
+  renderResultMeta(pendingMeta);
   try {
     const result = await fn();
     if (!result.ok) {
@@ -459,7 +540,17 @@ async function runAction(buttonId, busyLabel, fn) {
     return result;
   } catch (error) {
     setOutput(error.message || String(error));
-    await saveWorkspacePatch({ output: error.message || String(error), lastAction: 'error' });
+    const failedMeta = {
+      ...pendingMeta,
+      statusLabel: 'Failed',
+      provenanceText: error.message || String(error),
+    };
+    renderResultMeta(failedMeta);
+    await saveWorkspacePatch({
+      output: error.message || String(error),
+      outputMeta: failedMeta,
+      lastAction: 'error',
+    });
     return null;
   } finally {
     setBusy(buttonId, busyLabel, false);
@@ -525,9 +616,31 @@ $('ask-prompt').addEventListener('input', async () => {
   await saveWorkspacePatch({ prompt: $('ask-prompt').value });
 });
 
+$('explain-selection').addEventListener('click', async () => {
+  const prompt = $('ask-prompt').value.trim();
+  const result = await runAction('explain-selection', 'Explaining…', buildPlannedMeta('Explain Selection'), () => sendMessage({
+    type: 'RUN_WORKFLOW',
+    mode: 'explain-selection',
+    prompt,
+    target: 'generic',
+  }));
+  if (!result) return;
+  setOutput(result.text || 'Done.');
+  renderResultMeta(result.meta || null);
+  await saveWorkspacePatch({
+    prompt,
+    output: result.text || '',
+    outputMeta: result.meta || null,
+    mode: 'explain-selection',
+    lastAction: 'popup-explain-selection',
+    source: 'popup',
+  });
+  await openWorkspace();
+});
+
 $('summarize-page').addEventListener('click', async () => {
   const prompt = $('ask-prompt').value.trim();
-  const result = await runAction('summarize-page', 'Summarizing…', () => sendMessage({
+  const result = await runAction('summarize-page', 'Summarizing…', buildPlannedMeta('Summarize'), () => sendMessage({
     type: 'RUN_WORKFLOW',
     mode: 'summarize',
     prompt,
@@ -535,9 +648,11 @@ $('summarize-page').addEventListener('click', async () => {
   }));
   if (!result) return;
   setOutput(result.text || 'Done.');
+  renderResultMeta(result.meta || null);
   await saveWorkspacePatch({
     prompt,
     output: result.text || '',
+    outputMeta: result.meta || null,
     mode: 'summarize',
     lastAction: 'popup-summarize',
     source: 'popup',
@@ -545,9 +660,31 @@ $('summarize-page').addEventListener('click', async () => {
   await openWorkspace();
 });
 
+$('extract-facts').addEventListener('click', async () => {
+  const prompt = $('ask-prompt').value.trim();
+  const result = await runAction('extract-facts', 'Extracting…', buildPlannedMeta('Extract Facts'), () => sendMessage({
+    type: 'RUN_WORKFLOW',
+    mode: 'extract-facts',
+    prompt,
+    target: 'generic',
+  }));
+  if (!result) return;
+  setOutput(result.text || 'Done.');
+  renderResultMeta(result.meta || null);
+  await saveWorkspacePatch({
+    prompt,
+    output: result.text || '',
+    outputMeta: result.meta || null,
+    mode: 'extract-facts',
+    lastAction: 'popup-extract-facts',
+    source: 'popup',
+  });
+  await openWorkspace();
+});
+
 $('ask-page').addEventListener('click', async () => {
   const prompt = $('ask-prompt').value.trim();
-  const result = await runAction('ask-page', 'Asking…', () => sendMessage({
+  const result = await runAction('ask-page', 'Asking…', buildPlannedMeta('Ask Hermes'), () => sendMessage({
     type: 'RUN_WORKFLOW',
     mode: 'ask',
     prompt,
@@ -555,9 +692,11 @@ $('ask-page').addEventListener('click', async () => {
   }));
   if (!result) return;
   setOutput(result.text || 'Done.');
+  renderResultMeta(result.meta || null);
   await saveWorkspacePatch({
     prompt,
     output: result.text || '',
+    outputMeta: result.meta || null,
     mode: 'ask',
     lastAction: 'popup-ask',
     source: 'popup',
@@ -567,16 +706,18 @@ $('ask-page').addEventListener('click', async () => {
 
 $('build-context').addEventListener('click', async () => {
   const prompt = $('ask-prompt').value.trim();
-  const built = await runAction('build-context', 'Building…', () => sendMessage({
+  const built = await runAction('build-context', 'Building…', buildPlannedMeta('Build Context'), () => sendMessage({
     type: 'BUILD_CONTEXT',
     prompt,
     target: 'auto',
   }));
   if (!built) return;
   setOutput(built.text || 'Done.');
+  renderResultMeta(built.meta || null);
   await saveWorkspacePatch({
     prompt,
     output: built.text || '',
+    outputMeta: built.meta || null,
     mode: 'inject',
     target: built.target || 'auto',
     lastAction: 'popup-build-context',
@@ -586,16 +727,25 @@ $('build-context').addEventListener('click', async () => {
 });
 
 $('insert-latest').addEventListener('click', async () => {
-  const inserted = await runAction('insert-latest', 'Inserting…', () => sendMessage({
+  const inserted = await runAction('insert-latest', 'Inserting…', buildPlannedMeta('Insert Latest'), () => sendMessage({
     type: 'INSERT_LATEST_CONTEXT',
   }));
   if (!inserted) return;
 
   const finalText = `${inserted.text || ''}\n\n[Inserted latest context into active chat]`;
+  const insertedMeta = {
+    modeLabel: 'Insert Latest',
+    scopeLabel: inserted.item?.scopeLabel || 'Saved handoff',
+    destinationLabel: 'Active AI chat',
+    statusLabel: 'Done',
+    provenanceText: inserted.item?.provenanceText || 'Used the latest saved handoff context.',
+  };
   setOutput(finalText);
+  renderResultMeta(insertedMeta);
   await saveWorkspacePatch({
     prompt: $('ask-prompt').value.trim(),
     output: finalText,
+    outputMeta: insertedMeta,
     mode: 'inject',
     lastAction: 'popup-insert-latest-context',
     source: 'popup',

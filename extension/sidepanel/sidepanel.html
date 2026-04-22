@@ -16,6 +16,11 @@
         <button id="refresh-page" class="icon-btn" title="Refresh page context">↻</button>
       </header>
 
+      <section class="panel live-session-panel">
+        <div id="live-session-title" class="section-title">Standalone relay mode</div>
+        <div id="live-session-meta" class="page-meta">Run /live on in the Hermes terminal session you want to share.</div>
+      </section>
+
       <section class="panel page-panel">
         <div id="page-title" class="page-title">Loading page context…</div>
         <div id="page-meta" class="page-meta">Looking at the active tab</div>
@@ -61,13 +66,13 @@
         <div class="section-title">Workflows</div>
         <div class="workflow-grid">
           <button class="workflow-btn active" data-mode="ask">Ask</button>
+          <button class="workflow-btn" data-mode="explain-selection">Explain Selection</button>
           <button class="workflow-btn" data-mode="summarize">Summarize</button>
+          <button class="workflow-btn" data-mode="extract-facts">Extract Facts</button>
           <button class="workflow-btn" data-mode="next-steps">Next Steps</button>
           <button class="workflow-btn" data-mode="draft-reply">Draft Reply</button>
           <button class="workflow-btn" data-mode="extract-tasks">Tasks</button>
           <button class="workflow-btn" data-mode="research">Research</button>
-          <button class="workflow-btn" data-mode="compare">Compare</button>
-          <button class="workflow-btn" data-mode="capture">Capture</button>
         </div>
       </section>
 
@@ -101,6 +106,15 @@
             <button id="copy-workspace-output" class="secondary-btn">Copy</button>
             <button id="open-workspace-output" class="secondary-btn">Open</button>
           </div>
+        </div>
+        <div id="workspace-output-meta" class="history-item output-meta-card">
+          <div class="history-top">
+            <span class="history-type">latest run</span>
+            <span id="workspace-output-status" class="history-time">Idle</span>
+          </div>
+          <div id="workspace-output-title" class="history-title">No Hermes run yet.</div>
+          <div id="workspace-output-summary" class="history-summary">Run a workflow, direct line, or handoff to see scope and destination details here.</div>
+          <div id="workspace-output-provenance" class="history-provenance"></div>
         </div>
         <pre id="workspace-output" class="workspace-output">Hermes output will appear here.</pre>
       </section>

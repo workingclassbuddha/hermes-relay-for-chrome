@@ -29,6 +29,7 @@ export const DEFAULT_WORKSPACE_STATE = {
   mode: 'ask',
   target: 'auto',
   output: '',
+  outputMeta: null,
   lastAction: '',
   pageLock: false,
   lockedPageUrl: '',

@@ -12,6 +12,8 @@ let trackedSearch = '';
 let trackedPinnedOnly = false;
 let currentDirectThread = null;
 let currentWorkspaceUrl = '';
+let currentLiveSession = null;
+let currentOutputMeta = null;
 
 function setWorkspaceDisabled(disabled) {
   [
@@ -66,6 +68,7 @@ function persistWorkspaceState(extra = {}) {
       mode: currentMode,
       target: $('workspace-target')?.value || 'auto',
       output: currentOutput || '',
+      outputMeta: currentOutputMeta,
       trackedSearch,
       trackedPinnedOnly,
       ...extra,
@@ -85,11 +88,25 @@ function applyWorkspaceState(state = {}, { persist = false } = {}) {
   setMode(currentMode, { persist });
   currentOutput = state.output || '';
   $('workspace-output').textContent = currentOutput || 'Hermes output will appear here.';
+  renderOutputMeta(state.outputMeta || null);
 }
 
-function setOutput(text) {
+function renderOutputMeta(meta = null) {
+  currentOutputMeta = meta && typeof meta === 'object' ? meta : null;
+  $('workspace-output-status').textContent = currentOutputMeta?.statusLabel || 'Idle';
+  $('workspace-output-title').textContent = currentOutputMeta?.modeLabel || 'No Hermes run yet.';
+  $('workspace-output-summary').textContent = currentOutputMeta
+    ? [currentOutputMeta.scopeLabel, currentOutputMeta.destinationLabel].filter(Boolean).join(' · ')
+    : 'Run a workflow, direct line, or handoff to see scope and destination details here.';
+  $('workspace-output-provenance').textContent = currentOutputMeta?.provenanceText || '';
+}
+
+function setOutput(text, meta = undefined) {
   currentOutput = text || '';
   $('workspace-output').textContent = currentOutput || 'Hermes output will appear here.';
+  if (meta !== undefined) {
+    renderOutputMeta(meta);
+  }
   persistWorkspaceState();
 }
 
@@ -121,7 +138,9 @@ function renderHandoffStatus(response) {
   }
 
   if (!handoff.available) {
-    $('handoff-status').textContent = 'Build context from a page before inserting it into a chat.';
+    $('handoff-status').textContent = handoff.canAllowCurrentHost
+      ? `Hermes can route into ${handoff.activeHostname}. Allow this host first, then build context from a page.`
+      : 'Build context from a page before inserting it into a chat.';
     return;
   }
 
@@ -131,6 +150,26 @@ function renderHandoffStatus(response) {
   }
 
   $('handoff-status').textContent = `Latest context ready from ${handoff.title || 'a recent page'} · ${relativeTime(handoff.timestamp)}`;
+}
+
+function renderLiveSessionStatus(payload = {}) {
+  const live = payload.liveSession || {};
+  currentLiveSession = live.ok ? (live.session || null) : null;
+  const title = $('live-session-title');
+  const meta = $('live-session-meta');
+  if (!title || !meta) return;
+
+  if (currentLiveSession) {
+    title.textContent = 'Attached to live terminal session';
+    meta.textContent = [
+      currentLiveSession.session_title || currentLiveSession.session_id || 'Live session',
+      currentLiveSession.session_id || '',
+    ].filter(Boolean).join(' · ');
+    return;
+  }
+
+  title.textContent = 'Standalone relay mode';
+  meta.textContent = 'Run /live on in the Hermes terminal session you want to share.';
 }
 
 async function restoreWorkspaceState() {
@@ -221,6 +260,13 @@ function renderHistory(items) {
       </div>
       <div class="history-title">${escapeHtml(item.title || 'Hermes action')}</div>
       <div class="history-summary">${escapeHtml(item.summary || '')}</div>
+      <div class="history-flags">
+        ${item.modeLabel ? `<span class="history-badge">${escapeHtml(item.modeLabel)}</span>` : ''}
+        ${item.scopeLabel ? `<span class="history-badge">${escapeHtml(item.scopeLabel)}</span>` : ''}
+        ${item.destinationLabel ? `<span class="history-badge">${escapeHtml(item.destinationLabel)}</span>` : ''}
+        ${item.statusLabel ? `<span class="history-badge">${escapeHtml(item.statusLabel)}</span>` : ''}
+      </div>
+      ${item.provenanceText ? `<div class="history-provenance">${escapeHtml(item.provenanceText)}</div>` : ''}
       <div class="history-actions">
         <button class="history-btn" data-action="use">Use</button>
         <button class="history-btn" data-action="open">Open</button>
@@ -325,7 +371,11 @@ async function refreshHandoffStatus() {
 
 async function refreshPage() {
   const previousWorkspaceUrl = currentWorkspaceUrl;
-  const response = await sendMessage({ type: 'GET_ACTIVE_PAGE_CONTEXT' });
+  const [status, response] = await Promise.all([
+    sendMessage({ type: 'GET_STATUS' }),
+    sendMessage({ type: 'GET_ACTIVE_PAGE_CONTEXT' }),
+  ]);
+  renderLiveSessionStatus(status);
   if (!response.ok) {
     renderUnavailablePage(response.error || 'Could not read the active page.');
     await refreshHandoffStatus();
@@ -385,6 +435,8 @@ async function runCurrentWorkflow() {
   persistWorkspaceState({
     lastAction: `workflow-${currentMode}`,
     target: $('workspace-target').value,
+    output: response.text || '',
+    outputMeta: response.meta || null,
   });
   await refreshHistory();
 }
@@ -409,6 +461,8 @@ async function buildContext() {
   persistWorkspaceState({
     lastAction: 'build-context',
     target: response.target || $('workspace-target').value,
+    output: response.text || '',
+    outputMeta: response.meta || null,
   });
   await refreshHistory();
   await refreshHandoffStatus();
@@ -425,8 +479,18 @@ async function insertLatestContext() {
   }
 
   setOutput(`${response.text || ''}\n\n[Inserted latest context into active chat]`);
+  const insertedMeta = {
+    modeLabel: 'Insert Latest',
+    scopeLabel: response.item?.scopeLabel || 'Saved handoff',
+    destinationLabel: 'Active AI chat',
+    statusLabel: 'Done',
+    provenanceText: response.item?.provenanceText || 'Used the latest saved handoff context.',
+  };
+  renderOutputMeta(insertedMeta);
   persistWorkspaceState({
     lastAction: 'insert-latest-context',
+    output: `${response.text || ''}\n\n[Inserted latest context into active chat]`,
+    outputMeta: insertedMeta,
   });
   await refreshHistory();
   await refreshHandoffStatus();
@@ -452,7 +516,12 @@ $('send-direct').addEventListener('click', async () => {
   }
 
   $('direct-prompt').value = '';
-  persistWorkspaceState({ lastAction: 'direct-line' });
+  renderOutputMeta(response.meta || null);
+  persistWorkspaceState({
+    lastAction: 'direct-line',
+    output: response.text || '',
+    outputMeta: response.meta || null,
+  });
   renderDirectThread(response.thread);
   setOutput(response.text || '');
   await refreshHistory();
@@ -566,7 +635,12 @@ document.querySelectorAll('.memory-btn').forEach((button) => {
       setOutput(response.error || 'Hermes memory action failed.');
       return;
     }
-    setOutput(response.text || '');
+    setOutput(response.text || '', response.meta || null);
+    persistWorkspaceState({
+      lastAction: `memory-${button.dataset.kind}`,
+      output: response.text || '',
+      outputMeta: response.meta || null,
+    });
     await refreshHistory();
   });
 });

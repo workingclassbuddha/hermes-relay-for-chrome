@@ -242,10 +242,14 @@ async function messageGetStatus() {
   const { config, health, localDevConfig } = await getRuntimeConfig({
     ensureReachable: true,
   });
-  const preflight = await getAuthenticatedPreflight(config, health);
+  const [preflight, liveSession] = await Promise.all([
+    getAuthenticatedPreflight(config, health),
+    hermesClient.getCurrentLiveSession(config),
+  ]);
   return {
     health,
     preflight,
+    liveSession,
     config,
     localDevConfig: localDevConfig ? {
       source: localDevConfig.source,

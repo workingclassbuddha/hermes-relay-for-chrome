@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildDirectThreadMeta, createRelayOperations } from '../extension/lib/background/workflows.js';
+import {
+  buildBrowserContextEnvelope,
+  buildDirectThreadMeta,
+  createRelayOperations,
+} from '../extension/lib/background/workflows.js';
 
 test('buildDirectThreadMeta canonicalizes page urls for thread identity', () => {
   const meta = buildDirectThreadMeta(
@@ -45,6 +49,126 @@ test('insertLatestContext requires a previously built context bundle', async () 
   });
 
   await assert.rejects(() => operations.insertLatestContext(), /Build context from a page first/);
+});
+
+test('runWorkflow routes through an attached live session when available', async () => {
+  const pushed = [];
+  const operations = createRelayOperations({
+    storageApi: {
+      async pushRecent(item) {
+        pushed.push(item);
+      },
+    },
+    getConfig: async () => ({
+      baseUrl: 'http://127.0.0.1:8642',
+      apiKey: 'local-key',
+      conversationPrefix: 'relay',
+    }),
+    pageContextApi: {
+      async getActiveTab() {
+        return {
+          id: 3,
+          title: 'Example',
+          url: 'https://example.com/article',
+        };
+      },
+      async extractPageContext() {
+        return {
+          title: 'Example Article',
+          url: 'https://example.com/article',
+          hostname: 'example.com',
+          pageType: 'article',
+          text: 'Important page text.',
+          description: 'An example article.',
+          headings: ['Heading'],
+          selection: 'Critical selected line.',
+        };
+      },
+      isRestrictedBrowserUrl() {
+        return false;
+      },
+    },
+    hermesClient: {
+      async getCurrentLiveSession() {
+        return {
+          ok: true,
+          session: {
+            session_id: 'sess_live',
+            session_title: 'Live Session',
+          },
+        };
+      },
+      async sendLiveCommand(_config, payload) {
+        assert.equal(payload.sessionId, 'sess_live');
+        assert.equal(payload.type, 'workflow.run');
+        assert.match(payload.prompt, /Browser command: Summarize/);
+        assert.match(payload.prompt, /Scope: Selection first/);
+        assert.deepEqual(payload.metadata.provenance, [
+          'page title',
+          'URL',
+          'selected text',
+          'description',
+          'visible headings',
+          'article body',
+        ]);
+        return {
+          ok: true,
+          text: 'Live summary',
+          sessionId: 'sess_live',
+          raw: { ok: true },
+        };
+      },
+      async callResponse() {
+        throw new Error('should not use direct API path when live session exists');
+      },
+    },
+    browser: {
+      tabs: {},
+      sidePanel: {},
+    },
+  });
+
+  const result = await operations.runWorkflow({
+    mode: 'summarize',
+    prompt: 'Summarize this page',
+    target: 'generic',
+  });
+
+  assert.equal(result.text, 'Live summary');
+  assert.equal(result.source, 'live-session');
+  assert.equal(pushed[0].source, 'live-session');
+  assert.equal(result.meta.scopeLabel, 'Selection first');
+  assert.equal(pushed[0].provenanceText, 'Used page title + URL + selected text + description + visible headings + article body');
+});
+
+test('buildBrowserContextEnvelope prioritizes selected text and captures provenance', () => {
+  const envelope = buildBrowserContextEnvelope({
+    title: 'Example',
+    url: 'https://example.com/article',
+    hostname: 'example.com',
+    pageType: 'article',
+    selection: 'Selected text',
+    description: 'Description',
+    headings: ['Heading A', 'Heading B'],
+    text: 'Body text',
+  }, {
+    mode: 'extract-facts',
+    userPrompt: 'Find the key facts.',
+    target: 'generic',
+    timestamp: '2026-04-22T00:00:00.000Z',
+  });
+
+  assert.equal(envelope.scope, 'selection');
+  assert.equal(envelope.scopeLabel, 'Selection first');
+  assert.deepEqual(envelope.provenance, [
+    'page title',
+    'URL',
+    'selected text',
+    'description',
+    'visible headings',
+    'article body',
+  ]);
+  assert.match(envelope.prompt, /Content priority: selected text, then readable page body, then page metadata/);
 });
 
 test('insertLatestContext forwards the saved bundle into the active chat tab', async () => {

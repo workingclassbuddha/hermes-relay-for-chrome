@@ -301,6 +301,94 @@ export function createHermesClient({
     return modelsResult;
   }
 
+  async function getCurrentLiveSession(config = DEFAULT_CONFIG) {
+    const baseUrl = normalizeBaseUrl(config.baseUrl);
+    try {
+      const response = await fetchWithTimeout(`${baseUrl}/v1/live-sessions/current`, {
+        method: 'GET',
+        headers: authHeaders(config),
+      }, HEALTH_TIMEOUT_MS);
+      if (response.status === 404) {
+        return {
+          ok: false,
+          attached: false,
+          status: 'none',
+          baseUrl,
+          message: 'No live CLI session is currently attached.',
+        };
+      }
+      if (!response.ok) {
+        return {
+          ok: false,
+          attached: false,
+          status: response.status,
+          baseUrl,
+          message: `Live session discovery returned HTTP ${response.status}.`,
+        };
+      }
+      const payload = await response.json();
+      return {
+        ok: true,
+        attached: true,
+        status: 'ok',
+        baseUrl,
+        session: payload?.session || null,
+        message: payload?.session?.session_title
+          ? `Attached live session available: ${payload.session.session_title}`
+          : 'Attached live session available.',
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        attached: false,
+        status: 'offline',
+        baseUrl,
+        message: error.message || 'Unable to check live session status.',
+      };
+    }
+  }
+
+  async function sendLiveCommand(config = DEFAULT_CONFIG, {
+    sessionId,
+    type,
+    prompt,
+    metadata = {},
+    timeoutMs = RESPONSE_TIMEOUT_MS,
+  } = {}) {
+    const baseUrl = normalizeBaseUrl(config.baseUrl);
+    const response = await fetchWithTimeout(`${baseUrl}/v1/live-sessions/${encodeURIComponent(String(sessionId || '').trim())}/commands`, {
+      method: 'POST',
+      headers: authHeaders(config),
+      body: JSON.stringify({
+        type,
+        prompt,
+        metadata,
+      }),
+    }, timeoutMs);
+
+    const payload = await response.json().catch(() => ({}));
+    if (response.status === 202) {
+      return {
+        ok: false,
+        queued: true,
+        status: 202,
+        text: '',
+        raw: payload,
+      };
+    }
+    if (!response.ok) {
+      throw new Error(payload?.error || `Hermes live session command failed with HTTP ${response.status}.`);
+    }
+
+    return {
+      ok: true,
+      queued: false,
+      text: payload?.result?.text || payload?.command?.result?.text || '',
+      sessionId: payload?.result?.session_id || sessionId || '',
+      raw: payload,
+    };
+  }
+
   async function callResponse(config, { prompt, instructions, conversation }) {
     const response = await fetchWithTimeout(`${normalizeBaseUrl(config.baseUrl)}/v1/responses`, {
       method: 'POST',
@@ -346,7 +434,9 @@ export function createHermesClient({
     checkHealth,
     callResponse,
     fetchWithTimeout,
+    getCurrentLiveSession,
     preflightAccess,
     probeHealth,
+    sendLiveCommand,
   };
 }

@@ -78,6 +78,11 @@ select {
   box-shadow: inset 0 1px 0 rgba(242, 234, 215, 0.04);
 }
 
+.live-session-panel {
+  border-color: #95a66b;
+  background: rgba(82, 99, 48, 0.16);
+}
+
 .page-title {
   font-size: 15px;
   font-weight: 600;
@@ -353,6 +358,28 @@ input:focus {
   font-size: 12px;
 }
 
+.history-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.history-badge {
+  border-radius: 999px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  background: #2a311f;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.history-provenance {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
 .snapshot-summary {
   color: var(--muted);
   font-size: 12px;
@@ -404,4 +431,8 @@ input:focus {
   margin-top: 10px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.output-meta-card {
+  margin-bottom: 12px;
 }

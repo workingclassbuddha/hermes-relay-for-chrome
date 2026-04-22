@@ -13,9 +13,16 @@ import {
 } from '../shared/utils.js';
 
 function normalizeWorkspaceState(state = {}) {
+  const outputMeta = state?.outputMeta && typeof state.outputMeta === 'object'
+    ? {
+        ...state.outputMeta,
+        provenance: Array.isArray(state.outputMeta.provenance) ? state.outputMeta.provenance : [],
+      }
+    : null;
   return {
     ...DEFAULT_WORKSPACE_STATE,
     ...(state || {}),
+    outputMeta,
   };
 }
 
@@ -150,6 +157,15 @@ function normalizeRecentActions(items = [], timestamp = '', uuid = () => crypto.
       timestamp: item.timestamp || timestamp,
       summary: item.summary || '',
       output: item.output || '',
+      provenance: Array.isArray(item.provenance) ? item.provenance : [],
+      provenanceText: item.provenanceText || '',
+      scope: item.scope || '',
+      scopeLabel: item.scopeLabel || '',
+      destination: item.destination || '',
+      destinationLabel: item.destinationLabel || '',
+      status: item.status || 'done',
+      statusLabel: item.statusLabel || 'Done',
+      modeLabel: item.modeLabel || '',
     }))
     .slice(0, 12);
 }
