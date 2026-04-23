@@ -389,6 +389,97 @@ export function createHermesClient({
     };
   }
 
+  function buildLiveEventsUrl(config = DEFAULT_CONFIG, {
+    sessionId,
+    after = 0,
+  } = {}) {
+    const baseUrl = normalizeBaseUrl(config.baseUrl);
+    const url = new URL(`${baseUrl}/v1/live-sessions/${encodeURIComponent(String(sessionId || '').trim())}/events`);
+    if (config.apiKey) {
+      url.searchParams.set('access_token', config.apiKey);
+    }
+    if (after) {
+      url.searchParams.set('after', String(after));
+    }
+    return url.toString();
+  }
+
+  async function postLiveBrowserEvent(config = DEFAULT_CONFIG, {
+    sessionId,
+    type = 'browser.context',
+    payload = {},
+    commandId = '',
+    status = 'ok',
+    source = 'extension',
+  } = {}) {
+    const baseUrl = normalizeBaseUrl(config.baseUrl);
+    const response = await fetchWithTimeout(`${baseUrl}/v1/live-sessions/${encodeURIComponent(String(sessionId || '').trim())}/browser-events`, {
+      method: 'POST',
+      headers: authHeaders(config),
+      body: JSON.stringify({
+        type,
+        payload,
+        command_id: commandId,
+        status,
+        source,
+      }),
+    }, HEALTH_TIMEOUT_MS);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(body?.error?.message || body?.error || `Hermes browser event failed with HTTP ${response.status}.`);
+    }
+    return body;
+  }
+
+  async function postLiveBrowserResult(config = DEFAULT_CONFIG, {
+    sessionId,
+    payload = {},
+    commandId = '',
+    status = 'ok',
+    source = 'extension',
+  } = {}) {
+    const baseUrl = normalizeBaseUrl(config.baseUrl);
+    const response = await fetchWithTimeout(`${baseUrl}/v1/live-sessions/${encodeURIComponent(String(sessionId || '').trim())}/browser-results`, {
+      method: 'POST',
+      headers: authHeaders(config),
+      body: JSON.stringify({
+        payload,
+        command_id: commandId,
+        status,
+        source,
+      }),
+    }, HEALTH_TIMEOUT_MS);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(body?.error?.message || body?.error || `Hermes browser result failed with HTTP ${response.status}.`);
+    }
+    return body;
+  }
+
+  async function resolveLiveApproval(config = DEFAULT_CONFIG, {
+    sessionId,
+    approvalId,
+    decision,
+    payload = {},
+    source = 'extension',
+  } = {}) {
+    const baseUrl = normalizeBaseUrl(config.baseUrl);
+    const response = await fetchWithTimeout(`${baseUrl}/v1/live-sessions/${encodeURIComponent(String(sessionId || '').trim())}/approvals/${encodeURIComponent(String(approvalId || '').trim())}`, {
+      method: 'POST',
+      headers: authHeaders(config),
+      body: JSON.stringify({
+        decision,
+        payload,
+        source,
+      }),
+    }, HEALTH_TIMEOUT_MS);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(body?.error?.message || body?.error || `Hermes approval update failed with HTTP ${response.status}.`);
+    }
+    return body;
+  }
+
   async function callResponse(config, { prompt, instructions, conversation }) {
     const response = await fetchWithTimeout(`${normalizeBaseUrl(config.baseUrl)}/v1/responses`, {
       method: 'POST',
@@ -433,10 +524,14 @@ export function createHermesClient({
     authHeaders,
     checkHealth,
     callResponse,
+    buildLiveEventsUrl,
     fetchWithTimeout,
     getCurrentLiveSession,
+    postLiveBrowserEvent,
+    postLiveBrowserResult,
     preflightAccess,
     probeHealth,
+    resolveLiveApproval,
     sendLiveCommand,
   };
 }

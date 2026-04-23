@@ -91,6 +91,10 @@ function normalizeTrackedPages(items = [], timestamp = '') {
       hostname: item?.hostname || '',
       pageType: item?.pageType || 'page',
       pinned: Boolean(item?.pinned),
+      watchEnabled: Boolean(item?.watchEnabled),
+      watchIntervalMinutes: Number(item?.watchIntervalMinutes || 60),
+      lastWatchAt: item?.lastWatchAt || '',
+      lastWatchStatus: item?.lastWatchStatus || '',
       lastSeenAt: item?.lastSeenAt || item?.createdAt || timestamp,
       lastSnapshotAt: item?.lastSnapshotAt || '',
       createdAt: item?.createdAt || item?.lastSeenAt || timestamp,
@@ -170,6 +174,29 @@ function normalizeRecentActions(items = [], timestamp = '', uuid = () => crypto.
     .slice(0, 12);
 }
 
+function normalizeLiveEvents(items = []) {
+  const byKey = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    if (!item) continue;
+    const key = item.id || `${item.session_id || ''}:${item.sequence || ''}`;
+    if (!key) continue;
+    byKey.set(key, {
+      sequence: Number(item.sequence || 0),
+      id: item.id || key,
+      session_id: item.session_id || item.sessionId || '',
+      type: item.type || 'message',
+      created_at: item.created_at || item.timestamp || 0,
+      source: item.source || '',
+      command_id: item.command_id || item.commandId || '',
+      status: item.status || 'ok',
+      payload: item.payload && typeof item.payload === 'object' ? item.payload : {},
+    });
+  }
+  return [...byKey.values()]
+    .sort((left, right) => Number(left.sequence || 0) - Number(right.sequence || 0))
+    .slice(-150);
+}
+
 export function makePageDigest(page) {
   return JSON.stringify({
     title: page?.title || '',
@@ -206,6 +233,7 @@ export function migrateStorageRecord(data = {}, {
     pageNotes: normalizePageNotes(data.pageNotes || {}, timestamp),
     trackedPages: normalizeTrackedPages(data.trackedPages || [], timestamp),
     pageSnapshots: normalizeSnapshots(data.pageSnapshots || []),
+    liveEvents: normalizeLiveEvents(data.liveEvents || []),
   };
 }
 
@@ -352,6 +380,30 @@ export function createStorageApi({
     return items.find((item) => item.id === id) || null;
   }
 
+  async function getLiveEvents(sessionId = '') {
+    const data = await storage.get({ liveEvents: [] });
+    const items = normalizeLiveEvents(data.liveEvents || []);
+    return sessionId ? items.filter((item) => item.session_id === sessionId) : items;
+  }
+
+  async function pushLiveEvents(events = []) {
+    const data = await storage.get({ liveEvents: [] });
+    const next = normalizeLiveEvents([...(data.liveEvents || []), ...(Array.isArray(events) ? events : [events])]);
+    await storage.set({ liveEvents: next });
+    return next;
+  }
+
+  async function clearLiveEvents(sessionId = '') {
+    if (!sessionId) {
+      await storage.set({ liveEvents: [] });
+      return [];
+    }
+    const data = await storage.get({ liveEvents: [] });
+    const next = normalizeLiveEvents(data.liveEvents || []).filter((item) => item.session_id !== sessionId);
+    await storage.set({ liveEvents: next });
+    return next;
+  }
+
   async function getPageNotes() {
     const data = await storage.get({ pageNotes: {} });
     return data.pageNotes;
@@ -399,6 +451,10 @@ export function createStorageApi({
       hostname: page.hostname || existing?.hostname || '',
       pageType: page.pageType || existing?.pageType || 'page',
       pinned: pin ?? existing?.pinned ?? true,
+      watchEnabled: Boolean(existing?.watchEnabled),
+      watchIntervalMinutes: Number(existing?.watchIntervalMinutes || 60),
+      lastWatchAt: existing?.lastWatchAt || '',
+      lastWatchStatus: existing?.lastWatchStatus || '',
       lastSeenAt: timestamp,
       lastSnapshotAt: existing?.lastSnapshotAt || '',
       createdAt: existing?.createdAt || timestamp,
@@ -549,6 +605,9 @@ export function createStorageApi({
     pushRecent,
     getRecentActions,
     getRecentAction,
+    getLiveEvents,
+    pushLiveEvents,
+    clearLiveEvents,
     getPageNotes,
     getPageNote,
     savePageNote,

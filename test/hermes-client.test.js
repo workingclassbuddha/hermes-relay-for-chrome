@@ -196,6 +196,47 @@ test('sendLiveCommand returns live session response text', async () => {
   assert.match(seen[0].url, /\/v1\/live-sessions\/sess_live\/commands$/);
 });
 
+test('buildLiveEventsUrl authenticates EventSource streams with a query token', () => {
+  const client = createHermesClient();
+  const url = client.buildLiveEventsUrl({
+    baseUrl: 'http://127.0.0.1:8642',
+    apiKey: 'local-key',
+  }, {
+    sessionId: 'sess_live',
+    after: 12,
+  });
+
+  assert.equal(url, 'http://127.0.0.1:8642/v1/live-sessions/sess_live/events?access_token=local-key&after=12');
+});
+
+test('postLiveBrowserEvent sends browser context events to the live session API', async () => {
+  const seen = [];
+  const client = createHermesClient({
+    fetchImpl: async (url, options) => {
+      seen.push({ url: String(url), body: JSON.parse(options.body) });
+      return {
+        ok: true,
+        async json() {
+          return { ok: true, event: { type: 'browser.context' } };
+        },
+      };
+    },
+  });
+
+  const result = await client.postLiveBrowserEvent({
+    baseUrl: 'http://127.0.0.1:8642',
+    apiKey: 'local-key',
+  }, {
+    sessionId: 'sess_live',
+    type: 'browser.context',
+    payload: { page: { url: 'https://example.com' } },
+  });
+
+  assert.equal(result.ok, true);
+  assert.match(seen[0].url, /\/v1\/live-sessions\/sess_live\/browser-events$/);
+  assert.equal(seen[0].body.type, 'browser.context');
+});
+
 test('callResponse returns parsed output text', async () => {
   const client = createHermesClient({
     fetchImpl: async () => ({

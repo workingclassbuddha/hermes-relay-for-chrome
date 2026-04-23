@@ -111,3 +111,19 @@ test('createStorageApi ensures schema and normalizes config updates', async () =
   assert.equal(data.storageSchemaVersion, STORAGE_SCHEMA_VERSION);
   assert.equal(data.pageNotes['https://example.com/a'].text, 'legacy note');
 });
+
+test('createStorageApi stores live events in sequence order without duplicates', async () => {
+  const storage = createMemoryStorage();
+  const api = createStorageApi({ storage });
+
+  await api.pushLiveEvents([
+    { id: 'evt-2', sequence: 2, session_id: 'sess', type: 'assistant.final', payload: { text: 'done' } },
+    { id: 'evt-1', sequence: 1, session_id: 'sess', type: 'browser.context', payload: { page: {} } },
+    { id: 'evt-2', sequence: 2, session_id: 'sess', type: 'assistant.final', payload: { text: 'done again' } },
+  ]);
+
+  const events = await api.getLiveEvents('sess');
+
+  assert.deepEqual(events.map((event) => event.id), ['evt-1', 'evt-2']);
+  assert.equal(events[1].payload.text, 'done again');
+});

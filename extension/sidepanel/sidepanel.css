@@ -436,3 +436,15 @@ input:focus {
 .output-meta-card {
   margin-bottom: 12px;
 }
+
+.live-timeline .history-item.approval {
+  border-color: rgba(231, 181, 104, 0.42);
+  background: rgba(82, 55, 22, 0.42);
+}
+
+.approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}

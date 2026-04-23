@@ -247,6 +247,36 @@ export function buildBrowserContextEnvelope(page = {}, {
   };
 }
 
+function buildBrowserContextEventPayload(page = {}, contextEnvelope = {}, {
+  mode = 'ask',
+  target = 'generic',
+  userPrompt = '',
+} = {}) {
+  return {
+    mode,
+    target,
+    userPrompt,
+    scope: contextEnvelope.scope || deriveContextScope(page),
+    scopeLabel: contextEnvelope.scopeLabel || getContextScopeLabel(deriveContextScope(page)),
+    provenance: contextEnvelope.provenance || listContextInputs(page),
+    page: {
+      title: page?.title || '',
+      url: page?.url || '',
+      hostname: page?.hostname || '',
+      pageType: page?.pageType || 'page',
+      selection: page?.selection || '',
+      description: page?.description || '',
+      headings: Array.isArray(page?.headings) ? page.headings.slice(0, 12) : [],
+      links: Array.isArray(page?.links) ? page.links.slice(0, 25) : [],
+      forms: Array.isArray(page?.forms) ? page.forms.slice(0, 8) : [],
+      tables: Array.isArray(page?.tables) ? page.tables.slice(0, 5) : [],
+      focusedElement: page?.focusedElement || null,
+      signals: page?.signals || {},
+      textPreview: String(page?.text || '').slice(0, 2000),
+    },
+  };
+}
+
 function buildRunMeta({
   mode = 'ask',
   target = 'generic',
@@ -451,6 +481,7 @@ export function createRelayOperations({
     if (seenBefore) {
       const facts = [];
       if (tracked) facts.push(tracked.pinned ? 'tracked + pinned' : 'tracked');
+      if (tracked?.watchEnabled) facts.push('watched');
       if (note?.text) facts.push('has note');
       if (snapshotItems.length) facts.push(`${snapshotItems.length} snapshot${snapshotItems.length === 1 ? '' : 's'}`);
       if (directMessageCount) facts.push(`${directMessageCount} direct message${directMessageCount === 1 ? '' : 's'}`);
@@ -464,6 +495,8 @@ export function createRelayOperations({
       noteCount: note?.text ? 1 : 0,
       snapshotCount: snapshotItems.length,
       tracked: Boolean(tracked),
+      watchEnabled: Boolean(tracked?.watchEnabled),
+      watchIntervalMinutes: Number(tracked?.watchIntervalMinutes || 60),
       pinned: Boolean(tracked?.pinned),
       notePreview: summarizeNote(note?.text || '', 120),
       directMessageCount,
@@ -609,6 +642,16 @@ export function createRelayOperations({
 
     const liveSession = await hermesClient.getCurrentLiveSession(config);
     if (liveSession?.ok && liveSession.session?.session_id) {
+      await hermesClient.postLiveBrowserEvent?.(config, {
+        sessionId: liveSession.session.session_id,
+        type: 'browser.context',
+        status: 'ok',
+        payload: buildBrowserContextEventPayload(current.page, contextEnvelope, {
+          mode,
+          target: effectiveTarget,
+          userPrompt: prompt,
+        }),
+      });
       const livePrompt = composeLiveSessionPrompt(current.page, prompt, mode, effectiveTarget);
       const liveResult = await hermesClient.sendLiveCommand(config, {
         sessionId: liveSession.session.session_id,
@@ -762,6 +805,16 @@ export function createRelayOperations({
 
     const liveSession = await hermesClient.getCurrentLiveSession(config);
     if (liveSession?.ok && liveSession.session?.session_id) {
+      await hermesClient.postLiveBrowserEvent?.(config, {
+        sessionId: liveSession.session.session_id,
+        type: 'browser.context',
+        status: 'ok',
+        payload: buildBrowserContextEventPayload(current.page, contextEnvelope, {
+          mode: 'inject',
+          target,
+          userPrompt,
+        }),
+      });
       const livePrompt = composeLiveSessionPrompt(current.page, userPrompt, 'inject', target);
       const liveResult = await hermesClient.sendLiveCommand(config, {
         sessionId: liveSession.session.session_id,

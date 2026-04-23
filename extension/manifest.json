@@ -12,7 +12,8 @@
     "scripting",
     "tabs",
     "contextMenus",
-    "sidePanel"
+    "sidePanel",
+    "alarms"
   ],
   "commands": {
     "capture-page": {

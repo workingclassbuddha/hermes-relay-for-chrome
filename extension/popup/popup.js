@@ -407,11 +407,13 @@ function renderConfigSource(payload) {
 
 function renderLiveSession(payload = {}) {
   const live = payload.liveSession || {};
+  const timeline = payload.liveTimeline || {};
   const session = live.session || null;
   currentLiveSession = live.ok && session ? session : null;
   const card = $('live-session-card');
   const label = $('live-session-label');
   const detail = $('live-session-detail');
+  const activity = $('live-session-activity');
   if (!card || !label || !detail) return;
 
   card.classList.toggle('attached', Boolean(live.ok && session));
@@ -423,11 +425,25 @@ function renderLiveSession(payload = {}) {
       session.session_title || session.session_id || 'Live session',
       session.session_id || '',
     ].filter(Boolean).join(' · ');
+    if (activity) {
+      if (timeline.pendingApproval) {
+        activity.textContent = 'Approval needed in the workspace before Hermes can touch the page.';
+      } else if (timeline.activeCommand) {
+        activity.textContent = `Live activity: ${String(timeline.activeCommand.type || 'running').replace(/\./g, ' ')}.`;
+      } else if (timeline.lastResult) {
+        activity.textContent = `Last result: ${String(timeline.lastResult.type || 'done').replace(/\./g, ' ')}.`;
+      } else {
+        activity.textContent = 'Attached and waiting for browser or terminal activity.';
+      }
+    }
     return;
   }
 
   label.textContent = 'Standalone relay mode';
   detail.textContent = 'No live terminal session attached yet. Run /live on in Hermes to share this session.';
+  if (activity) {
+    activity.textContent = 'No shared live activity yet.';
+  }
 }
 
 function renderPage(response, readyToUse = false) {

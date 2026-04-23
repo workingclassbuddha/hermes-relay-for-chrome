@@ -219,6 +219,14 @@ summary:focus-visible {
   font-size: 12px;
 }
 
+.live-session-activity {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(118, 127, 104, 0.16);
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .continuity-banner {
   border-radius: 12px;
   padding: 10px 12px;
@@ -279,6 +287,20 @@ summary:focus-visible {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid rgba(118, 127, 104, 0.16);
+}
+
+.safety-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.safety-item {
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(118, 127, 104, 0.16);
+  background: rgba(8, 13, 11, 0.54);
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .status-meta,

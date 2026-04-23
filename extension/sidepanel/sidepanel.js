@@ -14,10 +14,12 @@ let currentDirectThread = null;
 let currentWorkspaceUrl = '';
 let currentLiveSession = null;
 let currentOutputMeta = null;
+let liveTimelineEvents = [];
 
 function setWorkspaceDisabled(disabled) {
   [
     'track-page',
+    'watch-page',
     'save-snapshot',
     'compare-snapshot',
     'refresh-direct',
@@ -211,6 +213,7 @@ function renderPage(page, tab, note, continuity) {
   $('page-meta').textContent = [page?.hostname, page?.pageType, page?.url].filter(Boolean).join(' · ');
   $('page-note').value = currentNote;
   $('track-page').textContent = continuity?.tracked ? 'Tracked' : 'Track Page';
+  $('watch-page').textContent = continuity?.watchEnabled ? 'Watching' : 'Watch Page';
   const headings = Array.isArray(page?.headings) ? page.headings : [];
   $('page-headings').innerHTML = headings.length
     ? headings.slice(0, 6).map((heading) => `<span class="tag">${escapeHtml(heading)}</span>`).join('')
@@ -275,6 +278,121 @@ function renderHistory(items) {
   `).join('');
 }
 
+function liveEventTitle(event = {}) {
+  const type = String(event.type || 'event').replace(/\./g, ' ');
+  if (event.type === 'assistant.final') return 'Hermes replied';
+  if (event.type === 'assistant.delta') return 'Hermes is streaming';
+  if (event.type === 'browser.context') return 'Browser context sent';
+  if (event.type === 'approval.requested') return 'Approval needed';
+  if (event.type === 'approval.resolved') return `Approval ${event.status || 'resolved'}`;
+  if (event.type === 'browser.action.result') return 'Browser action result';
+  return type;
+}
+
+function liveEventSummary(event = {}) {
+  const payload = event.payload || {};
+  if (event.type === 'assistant.delta') {
+    return String(payload.text || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+  }
+  if (event.type === 'assistant.final') {
+    return String(payload.text || '').replace(/\s+/g, ' ').trim().slice(0, 220);
+  }
+  if (event.type === 'browser.context') {
+    return [
+      payload.scopeLabel,
+      payload.page?.title,
+      payload.page?.url,
+    ].filter(Boolean).join(' · ');
+  }
+  if (event.type === 'approval.requested') {
+    return [
+      payload.action_type || payload.payload?.action_type || payload.payload?.type || 'browser action',
+      payload.payload?.preview || payload.payload?.selector || payload.payload?.url || '',
+    ].filter(Boolean).join(' · ');
+  }
+  if (event.type === 'browser.action.result') {
+    return payload.result?.error || payload.result?.action_type || payload.action?.action_type || 'Browser action completed.';
+  }
+  if (event.type === 'error') {
+    return payload.error || 'Hermes reported an error.';
+  }
+  return JSON.stringify(payload).slice(0, 220);
+}
+
+function getApprovalAction(event = {}) {
+  const payload = event.payload || {};
+  return {
+    action_type: payload.action_type || payload.payload?.action_type || payload.payload?.type || '',
+    payload: payload.payload || {},
+  };
+}
+
+function renderLiveTimeline(events = [], summary = {}) {
+  liveTimelineEvents = events || [];
+  const root = $('live-timeline');
+  const summaryRoot = $('live-timeline-summary');
+  if (summaryRoot) {
+    if (summary.pendingApproval) {
+      summaryRoot.textContent = 'Approval needed before Hermes can mutate the browser.';
+    } else if (summary.activeCommand) {
+      summaryRoot.textContent = `Live: ${String(summary.activeCommand.type || 'running').replace(/\./g, ' ')}`;
+    } else if (summary.lastResult) {
+      summaryRoot.textContent = `Last result: ${String(summary.lastResult.type || 'done').replace(/\./g, ' ')}`;
+    } else {
+      summaryRoot.textContent = summary.status ? `Stream: ${summary.status}` : 'No shared live session activity yet.';
+    }
+  }
+  if (!root) return;
+  const visible = [...liveTimelineEvents].slice(-30).reverse();
+  if (!visible.length) {
+    root.innerHTML = '<div class="history-empty">No live timeline events yet.</div>';
+    return;
+  }
+
+  const resolvedIds = new Set(
+    liveTimelineEvents
+      .filter((event) => event.type === 'approval.resolved')
+      .map((event) => event.payload?.approval_id)
+      .filter(Boolean),
+  );
+
+  root.innerHTML = visible.map((event) => {
+    const approvalId = event.payload?.approval_id || '';
+    const needsApproval = event.type === 'approval.requested' && approvalId && !resolvedIds.has(approvalId);
+    return `
+      <article class="history-item ${needsApproval ? 'approval' : ''}" data-event-id="${escapeHtml(event.id || '')}" data-approval-id="${escapeHtml(approvalId)}">
+        <div class="history-top">
+          <span class="history-type">${escapeHtml(String(event.type || 'event').replace(/\./g, ' '))}</span>
+          <span class="history-time">${event.created_at ? relativeTime(new Date(Number(event.created_at) * 1000).toISOString()) : 'just now'}</span>
+        </div>
+        <div class="history-title">${escapeHtml(liveEventTitle(event))}</div>
+        <div class="history-summary">${escapeHtml(liveEventSummary(event))}</div>
+        <div class="history-flags">
+          ${event.source ? `<span class="history-badge">${escapeHtml(event.source)}</span>` : ''}
+          ${event.status ? `<span class="history-badge">${escapeHtml(event.status)}</span>` : ''}
+        </div>
+        ${needsApproval ? `
+          <div class="approval-actions">
+            <button class="history-btn" data-action="approve-live">Approve</button>
+            <button class="history-btn" data-action="deny-live">Deny</button>
+          </div>
+        ` : ''}
+      </article>
+    `;
+  }).join('');
+}
+
+async function refreshLiveTimeline() {
+  const response = await sendMessage({
+    type: 'GET_LIVE_TIMELINE',
+    sessionId: currentLiveSession?.session_id || '',
+  });
+  if (!response.ok) {
+    return;
+  }
+  renderLiveTimeline(response.events || [], response.summary || {});
+}
+
 async function refreshHistory() {
   const response = await sendMessage({ type: 'GET_RECENTS' });
   renderHistory(response.recentActions || []);
@@ -316,11 +434,13 @@ function renderTrackedPages(items) {
         ${item.pinned ? '<span class="tracked-badge">Pinned</span>' : ''}
         ${item.hasNote ? '<span class="tracked-badge">Note</span>' : ''}
         ${item.snapshotCount ? `<span class="tracked-badge">${item.snapshotCount} snapshot${item.snapshotCount === 1 ? '' : 's'}</span>` : ''}
+        ${item.watchEnabled ? '<span class="tracked-badge">Watching</span>' : ''}
       </div>
       ${item.notePreview ? `<div class="tracked-note">${escapeHtml(item.notePreview)}</div>` : ''}
       <div class="history-actions">
         <button class="history-btn" data-action="open-tracked">Open</button>
         <button class="history-btn" data-action="toggle-pin">${item.pinned ? 'Unpin' : 'Pin'}</button>
+        <button class="history-btn" data-action="toggle-watch">${item.watchEnabled ? 'Unwatch' : 'Watch'}</button>
         <button class="history-btn" data-action="remove-tracked">Remove</button>
       </div>
     </article>
@@ -389,6 +509,7 @@ async function refreshPage() {
   await refreshSnapshots();
   await refreshDirectThread();
   await refreshHandoffStatus();
+  await refreshLiveTimeline();
 }
 
 async function refreshDirectThread() {
@@ -498,6 +619,7 @@ async function insertLatestContext() {
 
 $('refresh-page').addEventListener('click', refreshPage);
 $('refresh-direct').addEventListener('click', refreshDirectThread);
+$('refresh-live-timeline').addEventListener('click', refreshLiveTimeline);
 
 $('send-direct').addEventListener('click', async () => {
   if (!currentPage) {
@@ -554,6 +676,22 @@ $('track-page').addEventListener('click', async () => {
   }
   setOutput(`Tracked ${currentPage?.title || 'this page'}.`);
   persistWorkspaceState({ lastAction: 'track-page' });
+  await refreshTrackedPages();
+  await refreshPage();
+});
+
+$('watch-page').addEventListener('click', async () => {
+  const response = await sendMessage({
+    type: 'WATCH_PAGE',
+    page: currentPage,
+    intervalMinutes: 60,
+  });
+  if (!response.ok) {
+    setOutput(response.error || 'Could not watch this page.');
+    return;
+  }
+  setOutput(`Watching ${currentPage?.title || 'this page'} every hour while it is open.`);
+  persistWorkspaceState({ lastAction: 'watch-page' });
   await refreshTrackedPages();
   await refreshPage();
 });
@@ -683,6 +821,35 @@ $('workspace-history').addEventListener('click', async (event) => {
   }
 });
 
+$('live-timeline').addEventListener('click', async (event) => {
+  const button = event.target.closest('.history-btn');
+  const article = event.target.closest('.history-item');
+  if (!button || !article) return;
+  const approvalId = article.dataset.approvalId || '';
+  const liveEvent = liveTimelineEvents.find((item) => item.id === article.dataset.eventId);
+  if (!approvalId || !liveEvent) return;
+  const action = getApprovalAction(liveEvent);
+  const decision = button.dataset.action === 'approve-live' ? 'approved' : 'denied';
+  const response = await sendMessage({
+    type: 'RESOLVE_LIVE_APPROVAL',
+    sessionId: currentLiveSession?.session_id || liveEvent.session_id || '',
+    approvalId,
+    commandId: liveEvent.command_id || '',
+    decision,
+    action,
+  });
+  if (!response.ok) {
+    setOutput(response.error || 'Could not resolve the browser approval.');
+    return;
+  }
+  setOutput(
+    decision === 'approved'
+      ? 'Approved browser action and sent the result back to Hermes.'
+      : 'Denied browser action. Nothing changed on the page.',
+  );
+  await refreshLiveTimeline();
+});
+
 $('tracked-pages').addEventListener('click', async (event) => {
   const button = event.target.closest('.history-btn');
   const article = event.target.closest('.tracked-item');
@@ -715,6 +882,17 @@ $('tracked-pages').addEventListener('click', async (event) => {
     });
     await refreshTrackedPages();
   }
+
+  if (button.dataset.action === 'toggle-watch' && item) {
+    await sendMessage({
+      type: item.watchEnabled ? 'UNWATCH_PAGE' : 'WATCH_PAGE',
+      page: item,
+      url: article.dataset.url,
+      intervalMinutes: item.watchIntervalMinutes || 60,
+    });
+    await refreshTrackedPages();
+    await refreshPage();
+  }
 });
 
 $('workspace-prompt').addEventListener('input', () => persistWorkspaceState());
@@ -740,7 +918,14 @@ async function initializeWorkspace() {
   await refreshHistory();
   await refreshTrackedPages();
   await refreshHandoffStatus();
+  await refreshLiveTimeline();
 }
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === 'LIVE_EVENT_UPDATE' || message?.type === 'LIVE_APPROVAL_RESOLVED') {
+    refreshLiveTimeline().catch(() => {});
+  }
+});
 
 window.addEventListener('focus', () => {
   refreshPage().catch((error) => setOutput(error.message || String(error)));

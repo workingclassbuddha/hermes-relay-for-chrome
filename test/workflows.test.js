@@ -53,6 +53,7 @@ test('insertLatestContext requires a previously built context bundle', async () 
 
 test('runWorkflow routes through an attached live session when available', async () => {
   const pushed = [];
+  const browserEvents = [];
   const operations = createRelayOperations({
     storageApi: {
       async pushRecent(item) {
@@ -118,6 +119,10 @@ test('runWorkflow routes through an attached live session when available', async
           raw: { ok: true },
         };
       },
+      async postLiveBrowserEvent(_config, payload) {
+        browserEvents.push(payload);
+        return { ok: true, event: { type: payload.type } };
+      },
       async callResponse() {
         throw new Error('should not use direct API path when live session exists');
       },
@@ -139,6 +144,8 @@ test('runWorkflow routes through an attached live session when available', async
   assert.equal(pushed[0].source, 'live-session');
   assert.equal(result.meta.scopeLabel, 'Selection first');
   assert.equal(pushed[0].provenanceText, 'Used page title + URL + selected text + description + visible headings + article body');
+  assert.equal(browserEvents[0].type, 'browser.context');
+  assert.equal(browserEvents[0].payload.page.selection, 'Critical selected line.');
 });
 
 test('buildBrowserContextEnvelope prioritizes selected text and captures provenance', () => {

@@ -21,6 +21,17 @@
         <div id="live-session-meta" class="page-meta">Run /live on in the Hermes terminal session you want to share.</div>
       </section>
 
+      <section class="panel">
+        <div class="section-head">
+          <div class="section-title">Live Timeline</div>
+          <button id="refresh-live-timeline" class="secondary-btn">Refresh</button>
+        </div>
+        <div id="live-timeline-summary" class="handoff-status">No shared live session activity yet.</div>
+        <div id="live-timeline" class="history-list live-timeline">
+          <div class="history-empty">Run /live on, then send browser actions into Hermes.</div>
+        </div>
+      </section>
+
       <section class="panel page-panel">
         <div id="page-title" class="page-title">Loading page context…</div>
         <div id="page-meta" class="page-meta">Looking at the active tab</div>
@@ -29,6 +40,7 @@
         <div id="page-headings" class="tag-list"></div>
         <div class="page-actions">
           <button id="track-page" class="secondary-btn">Track Page</button>
+          <button id="watch-page" class="secondary-btn">Watch Page</button>
           <button id="save-snapshot" class="secondary-btn">Save Snapshot</button>
           <button id="compare-snapshot" class="secondary-btn">Compare To Last</button>
         </div>
