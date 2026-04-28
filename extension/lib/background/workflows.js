@@ -1,8 +1,26 @@
 import { findLatestContextAction, describeLatestContext } from './handoff.js';
-import { escapeHtml, buildConversationId, canonicalizeUrl, hashString, inferAssistantTarget, isSupportedChatUrl, summarizeNote } from '../shared/utils.js';
+import {
+  escapeHtml,
+  buildConversationId,
+  canonicalizeUrl,
+  hashString,
+  inferAssistantTarget,
+  isSupportedChatUrl,
+  summarizeNote,
+  getHostname,
+  isKnownAssistantHost,
+} from '../shared/utils.js';
 
 export function getModeDefinition(mode) {
   const table = {
+    'explain-selection': {
+      label: 'Explain Selection',
+      userPromptFallback: 'Explain the selected text and why it matters here.',
+      instructions:
+        'You are Hermes Relay. Explain the selected text first. If no explicit selection is present, explain the most relevant passage on the page. Clarify the meaning, relevance, and next useful takeaway.',
+      task:
+        'Explain the selected text in page context. Define key terms, surface why it matters, and end with the most useful takeaway.',
+    },
     ask: {
       label: 'Ask',
       userPromptFallback: 'Explain what matters on this page.',
@@ -42,6 +60,14 @@ export function getModeDefinition(mode) {
         'You are Hermes Relay. Extract tasks, commitments, blockers, and open questions from the page. Use clean bullets.',
       task:
         'Extract tasks, decisions, blockers, and open questions from the page.',
+    },
+    'extract-facts': {
+      label: 'Extract Facts',
+      userPromptFallback: 'Extract the key facts and claims from this page.',
+      instructions:
+        'You are Hermes Relay. Extract durable facts, claims, entities, numbers, dates, and named references from the page. Separate confirmed details from uncertain or implied claims.',
+      task:
+        'Extract the key facts from the page. Use a compact list and clearly mark anything that sounds uncertain, inferred, or worth verifying.',
     },
     research: {
       label: 'Research Brief',
@@ -102,6 +128,190 @@ export function getModeDefinition(mode) {
   return table[mode] || table.ask;
 }
 
+const CONTEXT_SCOPE_LABELS = {
+  selection: 'Selection first',
+  article: 'Visible article',
+  'visible-surface': 'Visible app surface',
+  'full-page': 'Readable page',
+  metadata: 'Page metadata',
+};
+
+export function deriveContextScope(page = {}) {
+  if (String(page?.selection || '').trim()) {
+    return 'selection';
+  }
+  if (page?.pageType === 'article') {
+    return 'article';
+  }
+  if (String(page?.text || '').trim()) {
+    return page?.pageType === 'app' ? 'visible-surface' : 'full-page';
+  }
+  return 'metadata';
+}
+
+export function getContextScopeLabel(scope = '') {
+  return CONTEXT_SCOPE_LABELS[scope] || CONTEXT_SCOPE_LABELS['full-page'];
+}
+
+function detectPageSignals(page = {}) {
+  const haystack = [
+    page?.title || '',
+    page?.description || '',
+    page?.text || '',
+  ].join(' ').toLowerCase();
+
+  return {
+    noisyPageLikely: page?.pageType === 'app' || (Array.isArray(page?.headings) && page.headings.length >= 6),
+    loginWallLikely: /\b(sign in|log in|login|subscribe to continue|create account|join to continue|members only)\b/.test(haystack),
+  };
+}
+
+export function listContextInputs(page = {}) {
+  const inputs = ['page title', 'URL'];
+
+  if (String(page?.selection || '').trim()) {
+    inputs.push('selected text');
+  }
+  if (String(page?.description || '').trim()) {
+    inputs.push('description');
+  }
+  if (Array.isArray(page?.headings) && page.headings.length) {
+    inputs.push('visible headings');
+  }
+  if (String(page?.text || '').trim()) {
+    inputs.push(page?.pageType === 'article' ? 'article body' : 'readable page body');
+  }
+
+  return inputs;
+}
+
+export function buildBrowserContextEnvelope(page = {}, {
+  mode = 'ask',
+  userPrompt = '',
+  target = 'generic',
+  timestamp = new Date().toISOString(),
+} = {}) {
+  const modeDef = getModeDefinition(mode);
+  const scope = deriveContextScope(page);
+  const scopeLabel = getContextScopeLabel(scope);
+  const provenance = listContextInputs(page);
+  const signals = detectPageSignals(page);
+  const sections = [
+    'Browser context envelope:',
+    `- Action type: ${modeDef.label}`,
+    `- User instruction: ${userPrompt || modeDef.userPromptFallback || '(none provided)'}`,
+    `- Scope: ${scopeLabel}`,
+    `- Page title: ${page?.title || '(untitled)'}`,
+    `- URL: ${page?.url || ''}`,
+    `- Hostname: ${page?.hostname || ''}`,
+    `- Page type: ${page?.pageType || 'page'}`,
+    `- Timestamp: ${timestamp}`,
+    `- Login wall likely: ${signals.loginWallLikely ? 'yes' : 'no'}`,
+    `- Noisy page likely: ${signals.noisyPageLikely ? 'yes' : 'no'}`,
+    `- Content priority: ${scope === 'selection'
+      ? 'selected text, then readable page body, then page metadata'
+      : 'readable page body, then visible headings and description, then page metadata'}`,
+  ];
+
+  if (page?.selection) {
+    sections.push(`Selected text:\n${page.selection}`);
+  }
+
+  if (page?.description) {
+    sections.push(`Page description:\n${page.description}`);
+  }
+
+  if (Array.isArray(page?.headings) && page.headings.length) {
+    sections.push(`Visible headings:\n- ${page.headings.join('\n- ')}`);
+  }
+
+  if (page?.text) {
+    sections.push(`Readable page body:\n${page.text}`);
+  } else {
+    sections.push('Readable page body:\n(no readable text found)');
+  }
+
+  if (mode === 'inject') {
+    sections.push(`Target assistant: ${target}`);
+  }
+
+  sections.push(`Task:\n${modeDef.task}`);
+  sections.push(`User request:\n${userPrompt || modeDef.userPromptFallback || ''}`);
+
+  return {
+    scope,
+    scopeLabel,
+    provenance,
+    provenanceText: provenance.length ? `Used ${provenance.join(' + ')}` : '',
+    prompt: sections.join('\n\n'),
+  };
+}
+
+function buildBrowserContextEventPayload(page = {}, contextEnvelope = {}, {
+  mode = 'ask',
+  target = 'generic',
+  userPrompt = '',
+} = {}) {
+  return {
+    mode,
+    target,
+    userPrompt,
+    scope: contextEnvelope.scope || deriveContextScope(page),
+    scopeLabel: contextEnvelope.scopeLabel || getContextScopeLabel(deriveContextScope(page)),
+    provenance: contextEnvelope.provenance || listContextInputs(page),
+    page: {
+      title: page?.title || '',
+      url: page?.url || '',
+      hostname: page?.hostname || '',
+      pageType: page?.pageType || 'page',
+      selection: page?.selection || '',
+      description: page?.description || '',
+      headings: Array.isArray(page?.headings) ? page.headings.slice(0, 12) : [],
+      links: Array.isArray(page?.links) ? page.links.slice(0, 25) : [],
+      forms: Array.isArray(page?.forms) ? page.forms.slice(0, 8) : [],
+      tables: Array.isArray(page?.tables) ? page.tables.slice(0, 5) : [],
+      focusedElement: page?.focusedElement || null,
+      signals: page?.signals || {},
+      textPreview: String(page?.text || '').slice(0, 2000),
+    },
+  };
+}
+
+function buildRunMeta({
+  mode = 'ask',
+  target = 'generic',
+  page = null,
+  source = 'standalone',
+  sessionId = '',
+  commandId = '',
+  scope = '',
+  provenance = [],
+  status = 'done',
+  statusLabel = '',
+  timestamp = '',
+} = {}) {
+  const modeDef = getModeDefinition(mode);
+  return {
+    mode,
+    modeLabel: modeDef.label,
+    target,
+    scope,
+    scopeLabel: getContextScopeLabel(scope),
+    source,
+    sessionId,
+    commandId,
+    status,
+    statusLabel: statusLabel || (status === 'queued' ? 'Queued' : status === 'failed' ? 'Failed' : 'Done'),
+    destination: source === 'live-session' ? 'shared-session' : 'popup-workspace',
+    destinationLabel: source === 'live-session' ? 'Current terminal session' : 'Popup and workspace',
+    provenance,
+    provenanceText: provenance.length ? `Used ${provenance.join(' + ')}` : '',
+    pageTitle: page?.title || '',
+    pageUrl: page?.url || '',
+    timestamp,
+  };
+}
+
 export function getTargetGuidance(target) {
   const table = {
     claude: 'Format the context so it reads naturally in Claude. Clean headings, high signal, no filler.',
@@ -113,54 +323,56 @@ export function getTargetGuidance(target) {
   return table[target] || table.generic;
 }
 
+function liveDisplayText(modeLabel, liveResult = {}) {
+  if (!liveResult?.queued) {
+    return liveResult?.text || '';
+  }
+
+  return `${modeLabel} queued in the live Hermes session. Watch the Live Timeline for the final response.`;
+}
+
 export function composeDirectPrompt(page, userPrompt) {
+  const envelope = buildBrowserContextEnvelope(page, {
+    mode: 'ask',
+    userPrompt,
+    target: 'generic',
+  });
   return [
-    `Current page title: ${page?.title || '(untitled)'}`,
-    `Current page URL: ${page?.url || ''}`,
-    `Hostname: ${page?.hostname || ''}`,
-    `Page type: ${page?.pageType || 'page'}`,
-    page?.description ? `Page description:\n${page.description}` : '',
-    Array.isArray(page?.headings) && page.headings.length
-      ? `Visible headings:\n- ${page.headings.join('\n- ')}`
-      : '',
-    page?.selection ? `Selected text:\n${page.selection}` : '',
-    `Page text excerpt:\n${page?.text || '(no readable text found)'}`,
-    `User message:\n${userPrompt}`,
+    'Direct browser message for Hermes.',
+    'Prioritize any selected text first, then the readable page body, then page metadata.',
+    '',
+    envelope.prompt,
   ].filter(Boolean).join('\n\n');
 }
 
 export function composePagePrompt(page, userPrompt, mode, target) {
+  return buildBrowserContextEnvelope(page, {
+    mode,
+    userPrompt,
+    target,
+  }).prompt;
+}
+
+export function composeLiveSessionPrompt(page, userPrompt, mode, target) {
   const modeDef = getModeDefinition(mode);
-  const sections = [
-    `Current page title: ${page.title || '(untitled)'}`,
-    `Current page URL: ${page.url}`,
-    `Hostname: ${page.hostname || ''}`,
-    `Page type: ${page.pageType || 'page'}`,
-    `Relay mode: ${modeDef.label}`,
-  ];
-
-  if (page.description) {
-    sections.push(`Page description:\n${page.description}`);
-  }
-
-  if (Array.isArray(page.headings) && page.headings.length) {
-    sections.push(`Visible headings:\n- ${page.headings.join('\n- ')}`);
-  }
-
-  if (page.selection) {
-    sections.push(`Selected text:\n${page.selection}`);
-  }
-
-  sections.push(`Page text excerpt:\n${page.text || '(no readable text found)'}`);
-
-  if (mode === 'inject') {
-    sections.push(`Target assistant: ${target}`);
-  }
-
-  sections.push(`Task:\n${modeDef.task}`);
-  sections.push(`User request:\n${userPrompt || modeDef.userPromptFallback || ''}`);
-
-  return sections.join('\n\n');
+  const envelope = buildBrowserContextEnvelope(page, {
+    mode,
+    userPrompt,
+    target,
+  });
+  const guidance = mode === 'inject'
+    ? `${modeDef.instructions} ${getTargetGuidance(target)}`
+    : modeDef.instructions;
+  return [
+    `[Browser command: ${modeDef.label}]`,
+    'Treat this as input from Hermes Relay attached to the user\'s live terminal session.',
+    'Use the browser context envelope below and answer directly in the shared session.',
+    'Be explicit about what you used: selection first when present, then readable body, then page metadata.',
+    '',
+    `Guidance:\n${guidance}`,
+    '',
+    envelope.prompt,
+  ].join('\n');
 }
 
 export function buildDirectThreadMeta(config, page, tab) {
@@ -179,7 +391,7 @@ export function createRelayOperations({
   storageApi,
   pageContextApi,
   hermesClient,
-  getConfig = () => storageApi.getConfig(),
+  getConfig = async () => (typeof storageApi.getConfig === 'function' ? storageApi.getConfig() : {}),
   browser = globalThis.chrome,
   uuid = () => crypto.randomUUID(),
   now = () => new Date().toISOString(),
@@ -281,6 +493,7 @@ export function createRelayOperations({
     if (seenBefore) {
       const facts = [];
       if (tracked) facts.push(tracked.pinned ? 'tracked + pinned' : 'tracked');
+      if (tracked?.watchEnabled) facts.push('watched');
       if (note?.text) facts.push('has note');
       if (snapshotItems.length) facts.push(`${snapshotItems.length} snapshot${snapshotItems.length === 1 ? '' : 's'}`);
       if (directMessageCount) facts.push(`${directMessageCount} direct message${directMessageCount === 1 ? '' : 's'}`);
@@ -294,6 +507,8 @@ export function createRelayOperations({
       noteCount: note?.text ? 1 : 0,
       snapshotCount: snapshotItems.length,
       tracked: Boolean(tracked),
+      watchEnabled: Boolean(tracked?.watchEnabled),
+      watchIntervalMinutes: Number(tracked?.watchIntervalMinutes || 60),
       pinned: Boolean(tracked?.pinned),
       notePreview: summarizeNote(note?.text || '', 120),
       directMessageCount,
@@ -324,6 +539,12 @@ export function createRelayOperations({
     const config = await getConfig();
     const meta = buildDirectThreadMeta(config, activePage, current.tab);
     const promptText = prompt.trim() || 'Take in this page and tell me what matters.';
+    const contextEnvelope = buildBrowserContextEnvelope(activePage, {
+      mode: 'ask',
+      userPrompt: promptText,
+      target: 'generic',
+      timestamp: now(),
+    });
     const result = await hermesClient.callResponse(config, {
       prompt: composeDirectPrompt(activePage, promptText),
       instructions: 'You are Hermes receiving live browser context from Hermes Relay. Treat the browser as your eyes and ears. Answer directly, ground yourself in the supplied page, and stay useful.',
@@ -370,6 +591,15 @@ export function createRelayOperations({
       summary: result.text.slice(0, 280),
       output: result.text,
       source,
+      modeLabel: 'Direct Line',
+      scope: contextEnvelope.scope,
+      scopeLabel: contextEnvelope.scopeLabel,
+      destination: 'popup-workspace',
+      destinationLabel: 'Popup and workspace',
+      status: 'done',
+      statusLabel: 'Done',
+      provenance: contextEnvelope.provenance,
+      provenanceText: contextEnvelope.provenanceText,
     });
 
     return {
@@ -379,6 +609,18 @@ export function createRelayOperations({
       page: activePage,
       text: result.text,
       raw: result.raw,
+      meta: {
+        ...buildRunMeta({
+          mode: 'ask',
+          target: 'generic',
+          page: activePage,
+          source: 'standalone',
+          scope: contextEnvelope.scope,
+          provenance: contextEnvelope.provenance,
+          timestamp: now(),
+        }),
+        modeLabel: 'Direct Line',
+      },
     };
   }
 
@@ -396,18 +638,115 @@ export function createRelayOperations({
     }
 
     const config = await getConfig();
-    const conversation = buildConversationId(config, `workflow-${mode}`);
     const effectiveTarget = mode === 'inject'
       ? (target === 'auto' ? inferAssistantTarget(current.page.url) : target)
       : 'generic';
-    const promptBody = composePagePrompt(current.page, prompt, mode, effectiveTarget);
+    const contextEnvelope = buildBrowserContextEnvelope(current.page, {
+      mode,
+      userPrompt: prompt,
+      target: effectiveTarget,
+      timestamp: now(),
+    });
+    const promptBody = contextEnvelope.prompt;
     const instructions = mode === 'inject'
       ? `${getModeDefinition(mode).instructions} ${getTargetGuidance(effectiveTarget)}`
       : getModeDefinition(mode).instructions;
+
+    const liveSession = await hermesClient.getCurrentLiveSession(config);
+    if (liveSession?.ok && liveSession.session?.session_id) {
+      await hermesClient.postLiveBrowserEvent?.(config, {
+        sessionId: liveSession.session.session_id,
+        type: 'browser.context',
+        status: 'ok',
+        payload: buildBrowserContextEventPayload(current.page, contextEnvelope, {
+          mode,
+          target: effectiveTarget,
+          userPrompt: prompt,
+        }),
+      });
+      const livePrompt = composeLiveSessionPrompt(current.page, prompt, mode, effectiveTarget);
+      const liveResult = await hermesClient.sendLiveCommand(config, {
+        sessionId: liveSession.session.session_id,
+        type: mode === 'inject' ? 'handoff.build' : 'workflow.run',
+        prompt: livePrompt,
+        metadata: {
+          mode,
+          target: effectiveTarget,
+          pageUrl: current.page.url || '',
+          pageTitle: current.page.title || title || 'Current page',
+          scope: contextEnvelope.scope,
+          provenance: contextEnvelope.provenance,
+        },
+      });
+      const modeLabel = getModeDefinition(mode).label;
+      const displayText = liveDisplayText(modeLabel, liveResult);
+      const status = liveResult.queued ? 'queued' : 'done';
+
+      const resultMeta = buildRunMeta({
+        mode,
+        target: effectiveTarget,
+        page: current.page,
+        source: 'live-session',
+        sessionId: liveResult.sessionId || liveSession.session.session_id,
+        commandId: liveResult.commandId || '',
+        scope: contextEnvelope.scope,
+        provenance: contextEnvelope.provenance,
+        status,
+        timestamp: now(),
+      });
+
+      await storageApi.pushRecent({
+        type: `workflow-${mode}`,
+        title: current.page.title || title || 'Current page',
+        url: current.page.url || url || '',
+        prompt,
+        summary: displayText.slice(0, 280),
+        output: displayText,
+        mode,
+        modeLabel,
+        target: effectiveTarget,
+        source: 'live-session',
+        sessionId: liveResult.sessionId || liveSession.session.session_id,
+        commandId: liveResult.commandId || '',
+        scope: contextEnvelope.scope,
+        scopeLabel: contextEnvelope.scopeLabel,
+        destination: resultMeta.destination,
+        destinationLabel: resultMeta.destinationLabel,
+        status: resultMeta.status,
+        statusLabel: resultMeta.statusLabel,
+        provenance: contextEnvelope.provenance,
+        provenanceText: contextEnvelope.provenanceText,
+      });
+
+      return {
+        page: current.page,
+        text: displayText,
+        raw: liveResult.raw,
+        mode,
+        target: effectiveTarget,
+        queued: Boolean(liveResult.queued),
+        commandId: liveResult.commandId || '',
+        sessionId: liveResult.sessionId || liveSession.session.session_id,
+        source: 'live-session',
+        meta: resultMeta,
+      };
+    }
+
+    const conversation = buildConversationId(config, `workflow-${mode}`);
     const result = await hermesClient.callResponse(config, {
       prompt: promptBody,
       instructions,
       conversation,
+    });
+
+    const resultMeta = buildRunMeta({
+      mode,
+      target: effectiveTarget,
+      page: current.page,
+      source: 'standalone',
+      scope: contextEnvelope.scope,
+      provenance: contextEnvelope.provenance,
+      timestamp: now(),
     });
 
     await storageApi.pushRecent({
@@ -418,7 +757,17 @@ export function createRelayOperations({
       summary: result.text.slice(0, 280),
       output: result.text,
       mode,
+      modeLabel: getModeDefinition(mode).label,
       target: effectiveTarget,
+      source: 'standalone',
+      scope: contextEnvelope.scope,
+      scopeLabel: contextEnvelope.scopeLabel,
+      destination: resultMeta.destination,
+      destinationLabel: resultMeta.destinationLabel,
+      status: resultMeta.status,
+      statusLabel: resultMeta.statusLabel,
+      provenance: contextEnvelope.provenance,
+      provenanceText: contextEnvelope.provenanceText,
     });
 
     return {
@@ -427,6 +776,8 @@ export function createRelayOperations({
       raw: result.raw,
       mode,
       target: effectiveTarget,
+      source: 'standalone',
+      meta: resultMeta,
     };
   }
 
@@ -463,13 +814,108 @@ export function createRelayOperations({
     const target = requestedTarget === 'auto'
       ? inferAssistantTarget(current.tab?.url || current.page.url)
       : requestedTarget;
-    const conversation = buildConversationId(config, 'inject');
-    const prompt = composePagePrompt(current.page, userPrompt, 'inject', target);
+    const contextEnvelope = buildBrowserContextEnvelope(current.page, {
+      mode: 'inject',
+      userPrompt,
+      target,
+      timestamp: now(),
+    });
+    const prompt = contextEnvelope.prompt;
     const instructions = `${getModeDefinition('inject').instructions} ${getTargetGuidance(target)}`;
+
+    const liveSession = await hermesClient.getCurrentLiveSession(config);
+    if (liveSession?.ok && liveSession.session?.session_id) {
+      await hermesClient.postLiveBrowserEvent?.(config, {
+        sessionId: liveSession.session.session_id,
+        type: 'browser.context',
+        status: 'ok',
+        payload: buildBrowserContextEventPayload(current.page, contextEnvelope, {
+          mode: 'inject',
+          target,
+          userPrompt,
+        }),
+      });
+      const livePrompt = composeLiveSessionPrompt(current.page, userPrompt, 'inject', target);
+      const liveResult = await hermesClient.sendLiveCommand(config, {
+        sessionId: liveSession.session.session_id,
+        type: 'handoff.build',
+        prompt: livePrompt,
+        metadata: {
+          mode: 'inject',
+          target,
+          pageUrl: current.page.url || '',
+          pageTitle: current.page.title || current.tab?.title || 'Current page',
+          scope: contextEnvelope.scope,
+          provenance: contextEnvelope.provenance,
+        },
+      });
+      const modeLabel = getModeDefinition('inject').label;
+      const displayText = liveDisplayText(modeLabel, liveResult);
+      const status = liveResult.queued ? 'queued' : 'done';
+
+      const resultMeta = buildRunMeta({
+        mode: 'inject',
+        target,
+        page: current.page,
+        source: 'live-session',
+        sessionId: liveResult.sessionId || liveSession.session.session_id,
+        commandId: liveResult.commandId || '',
+        scope: contextEnvelope.scope,
+        provenance: contextEnvelope.provenance,
+        status,
+        timestamp: now(),
+      });
+
+      await storageApi.pushRecent({
+        type: 'build-context',
+        title: current.page.title || current.tab?.title || 'Current page',
+        url: current.page.url || current.tab?.url || '',
+        summary: displayText.slice(0, 280),
+        output: displayText,
+        target,
+        mode: 'inject',
+        source: 'live-session',
+        sessionId: liveResult.sessionId || liveSession.session.session_id,
+        commandId: liveResult.commandId || '',
+        modeLabel,
+        scope: contextEnvelope.scope,
+        scopeLabel: contextEnvelope.scopeLabel,
+        destination: resultMeta.destination,
+        destinationLabel: resultMeta.destinationLabel,
+        status: resultMeta.status,
+        statusLabel: resultMeta.statusLabel,
+        provenance: contextEnvelope.provenance,
+        provenanceText: contextEnvelope.provenanceText,
+      });
+
+      return {
+        page: current.page,
+        target,
+        text: displayText,
+        raw: liveResult.raw,
+        queued: Boolean(liveResult.queued),
+        commandId: liveResult.commandId || '',
+        sessionId: liveResult.sessionId || liveSession.session.session_id,
+        source: 'live-session',
+        meta: resultMeta,
+      };
+    }
+
+    const conversation = buildConversationId(config, 'inject');
     const result = await hermesClient.callResponse(config, {
       prompt,
       instructions,
       conversation,
+    });
+
+    const resultMeta = buildRunMeta({
+      mode: 'inject',
+      target,
+      page: current.page,
+      source: 'standalone',
+      scope: contextEnvelope.scope,
+      provenance: contextEnvelope.provenance,
+      timestamp: now(),
     });
 
     await storageApi.pushRecent({
@@ -480,6 +926,16 @@ export function createRelayOperations({
       output: result.text,
       target,
       mode: 'inject',
+      source: 'standalone',
+      modeLabel: getModeDefinition('inject').label,
+      scope: contextEnvelope.scope,
+      scopeLabel: contextEnvelope.scopeLabel,
+      destination: resultMeta.destination,
+      destinationLabel: resultMeta.destinationLabel,
+      status: resultMeta.status,
+      statusLabel: resultMeta.statusLabel,
+      provenance: contextEnvelope.provenance,
+      provenanceText: contextEnvelope.provenanceText,
     });
 
     return {
@@ -487,20 +943,33 @@ export function createRelayOperations({
       target,
       text: result.text,
       raw: result.raw,
+      source: 'standalone',
+      meta: resultMeta,
     };
   }
 
   async function getLatestContextStatus() {
-    const [recentActions, activeTab] = await Promise.all([
+    const [recentActions, activeTab, config] = await Promise.all([
       storageApi.getRecentActions(),
       pageContextApi.getActiveTab(),
+      getConfig(),
     ]);
     const item = findLatestContextAction(recentActions);
+    const activeHostname = getHostname(activeTab?.url || '');
+    const customAssistantHosts = config?.customAssistantHosts || [];
+    const canInsertHere = isSupportedChatUrl(activeTab?.url || '', customAssistantHosts);
 
     return {
       ...describeLatestContext(item),
-      canInsertHere: isSupportedChatUrl(activeTab?.url || ''),
-      activeTarget: inferAssistantTarget(activeTab?.url || ''),
+      canInsertHere,
+      activeTarget: inferAssistantTarget(activeTab?.url || '', customAssistantHosts),
+      activeHostname,
+      canAllowCurrentHost: Boolean(
+        activeHostname
+        && !canInsertHere
+        && !pageContextApi.isRestrictedBrowserUrl(activeTab?.url || '')
+        && !isKnownAssistantHost(activeHostname),
+      ),
       item,
     };
   }
@@ -561,6 +1030,15 @@ export function createRelayOperations({
       summary: result.text.slice(0, 280),
       output: result.text,
       mode: 'snapshot-compare',
+      modeLabel: 'Snapshot Compare',
+      scope: deriveContextScope(current.page),
+      scopeLabel: getContextScopeLabel(deriveContextScope(current.page)),
+      destination: 'popup-workspace',
+      destinationLabel: 'Popup and workspace',
+      status: 'done',
+      statusLabel: 'Done',
+      provenance: listContextInputs(current.page),
+      provenanceText: `Used ${listContextInputs(current.page).join(' + ')} + previous snapshot`,
     });
 
     return {
@@ -568,21 +1046,36 @@ export function createRelayOperations({
       previous,
       text: result.text,
       raw: result.raw,
+      meta: {
+        ...buildRunMeta({
+          mode: 'compare',
+          target: 'generic',
+          page: current.page,
+          source: 'standalone',
+          scope: deriveContextScope(current.page),
+          provenance: [...listContextInputs(current.page), 'previous snapshot'],
+          timestamp: now(),
+        }),
+        modeLabel: 'Snapshot Compare',
+      },
     };
   }
 
   async function injectIntoActiveTab(text) {
     const activeTab = await pageContextApi.getActiveTab();
+    const config = await getConfig();
+    const customAssistantHosts = config?.customAssistantHosts || [];
     if (!activeTab?.id) {
       throw new Error('No active tab available.');
     }
     if (pageContextApi.isRestrictedBrowserUrl(activeTab?.url || '')) {
       throw new Error('Hermes Relay cannot insert context into browser-internal pages like chrome:// tabs.');
     }
-    if (!isSupportedChatUrl(activeTab?.url || '')) {
-      throw new Error('Open Claude, ChatGPT, or Gemini, then insert the latest Hermes context there.');
+    if (!isSupportedChatUrl(activeTab?.url || '', customAssistantHosts)) {
+      throw new Error('Open a supported AI chat or allow this site as a custom AI host first.');
     }
 
+    await pageContextApi.ensureChatBridge(activeTab.id);
     const reply = await browser.tabs.sendMessage(activeTab.id, {
       type: 'INSERT_HERMES_CONTEXT',
       text,
@@ -600,6 +1093,30 @@ export function createRelayOperations({
     });
 
     return reply;
+  }
+
+  async function addCustomAssistantHost(url = '') {
+    const hostname = getHostname(url);
+    if (!hostname) {
+      throw new Error('No valid hostname found for this page.');
+    }
+
+    if (isKnownAssistantHost(hostname)) {
+      return {
+        ok: true,
+        hostname,
+        config: await getConfig(),
+      };
+    }
+
+    const config = await getConfig();
+    return {
+      ok: true,
+      hostname,
+      config: await storageApi.setConfig({
+        customAssistantHosts: [...(config.customAssistantHosts || []), hostname],
+      }),
+    };
   }
 
   async function openContextResult(text, label) {
@@ -659,6 +1176,7 @@ export function createRelayOperations({
     insertLatestContext,
     compareWithLatestSnapshot,
     injectIntoActiveTab,
+    addCustomAssistantHost,
     openContextResult,
     openSidePanel,
   };

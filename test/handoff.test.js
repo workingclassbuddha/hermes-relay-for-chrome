@@ -14,6 +14,16 @@ test('findLatestContextAction returns the newest saved handoff action', () => {
   assert.equal(action?.output, 'context bundle');
 });
 
+test('findLatestContextAction ignores queued and failed context bundles', () => {
+  const action = findLatestContextAction([
+    { type: 'build-context', output: 'queued placeholder', status: 'queued', timestamp: '2026-04-22T01:00:00.000Z' },
+    { type: 'workflow-inject', output: 'failed placeholder', status: 'failed', timestamp: '2026-04-21T02:00:00.000Z' },
+    { type: 'build-context', output: 'ready context bundle', status: 'done', timestamp: '2026-04-21T01:00:00.000Z' },
+  ]);
+
+  assert.equal(action?.output, 'ready context bundle');
+});
+
 test('describeLatestContext returns an explicit unavailable state', () => {
   assert.deepEqual(describeLatestContext(null), {
     available: false,

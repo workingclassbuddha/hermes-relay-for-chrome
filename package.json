@@ -6,10 +6,14 @@
   "description": "Browser extension for Hermes Agent by Nous Research with page context, continuity, tracked pages, and AI handoff.",
   "scripts": {
     "check:manifest": "node -e \"JSON.parse(require('fs').readFileSync('extension/manifest.json', 'utf8')); console.log('manifest ok')\"",
-    "check:js": "node --check extension/background.js && node --check extension/content/chat.js && node --check extension/popup/popup.js && node --check extension/sidepanel/sidepanel.js && node --check scripts/setup-local.mjs",
-    "test": "node --test",
-    "check": "npm run check:manifest && npm run check:js && npm run test",
+    "check:js": "find extension scripts test \\( -name '*.js' -o -name '*.mjs' \\) | sort | xargs -n1 node --check",
+    "test": "node --test test/*.test.js",
+    "test:e2e": "node test/e2e/run-extension-fixtures.mjs",
+    "check": "npm run check:manifest && npm run check:js && npm run test && npm run test:e2e",
     "package:chrome": "node scripts/package-chrome.mjs",
     "setup:local": "node scripts/setup-local.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
   }
 }

@@ -99,13 +99,63 @@ test('createStorageApi ensures schema and normalizes config updates', async () =
   await api.setConfig({
     baseUrl: 'http://127.0.0.1:8642///',
     conversationPrefix: '  hermes-relay  ',
+    customAssistantHosts: ['Poe.com', 'poe.com', ' beta.example.ai '],
   });
 
   const config = await api.getConfig();
   assert.equal(config.baseUrl, 'http://127.0.0.1:8642');
   assert.equal(config.conversationPrefix, 'hermes-relay');
+  assert.deepEqual(config.customAssistantHosts, ['poe.com', 'beta.example.ai']);
 
   const data = storage.dump();
   assert.equal(data.storageSchemaVersion, STORAGE_SCHEMA_VERSION);
   assert.equal(data.pageNotes['https://example.com/a'].text, 'legacy note');
+});
+
+test('createStorageApi stores live events in sequence order without duplicates', async () => {
+  const storage = createMemoryStorage();
+  const api = createStorageApi({ storage });
+
+  await api.pushLiveEvents([
+    { id: 'evt-2', sequence: 2, session_id: 'sess', type: 'assistant.final', payload: { text: 'done' } },
+    { id: 'evt-1', sequence: 1, session_id: 'sess', type: 'browser.context', payload: { page: {} } },
+    { id: 'evt-2', sequence: 2, session_id: 'sess', type: 'assistant.final', payload: { text: 'done again' } },
+  ]);
+
+  const events = await api.getLiveEvents('sess');
+
+  assert.deepEqual(events.map((event) => event.id), ['evt-1', 'evt-2']);
+  assert.equal(events[1].payload.text, 'done again');
+});
+
+test('createStorageApi updates recent actions by live command id', async () => {
+  const storage = createMemoryStorage();
+  const api = createStorageApi({
+    storage,
+    now: () => '2026-04-21T00:00:00.000Z',
+    uuid: () => 'recent-1',
+  });
+
+  await api.pushRecent({
+    type: 'build-context',
+    title: 'Example',
+    commandId: 'cmd_queued',
+    status: 'queued',
+    statusLabel: 'Queued',
+    output: 'Build Context queued in the live Hermes session.',
+    summary: 'queued',
+  });
+
+  const updated = await api.updateRecentActionByCommandId('cmd_queued', {
+    status: 'done',
+    statusLabel: 'Done',
+    output: 'Final handoff bundle',
+    summary: 'Final handoff bundle',
+  });
+  const recents = await api.getRecentActions();
+
+  assert.equal(updated.output, 'Final handoff bundle');
+  assert.equal(updated.updatedAt, '2026-04-21T00:00:00.000Z');
+  assert.equal(recents[0].status, 'done');
+  assert.equal(recents[0].commandId, 'cmd_queued');
 });

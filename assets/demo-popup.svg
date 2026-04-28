@@ -1,0 +1,22 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Hermes Relay popup quick actions</title>
+  <desc id="desc">Illustrative popup surface with setup status, page scope, quick actions, and handoff status.</desc>
+  <rect width="960" height="640" rx="28" fill="#1f2318"/>
+  <rect x="60" y="48" width="840" height="544" rx="18" fill="#f5efe2"/>
+  <rect x="96" y="86" width="768" height="72" rx="12" fill="#303823"/>
+  <text x="128" y="132" fill="#f5efe2" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">Hermes Relay</text>
+  <text x="690" y="128" fill="#c6d79a" font-family="Inter, Arial, sans-serif" font-size="18">Ready</text>
+  <rect x="96" y="184" width="768" height="96" rx="10" fill="#ffffff" stroke="#d8cfbd"/>
+  <text x="128" y="222" fill="#202419" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">Local Hermes</text>
+  <text x="128" y="254" fill="#58604b" font-family="Inter, Arial, sans-serif" font-size="17">Connected at http://127.0.0.1:8642</text>
+  <circle cx="814" cy="232" r="12" fill="#7da657"/>
+  <rect x="96" y="304" width="368" height="72" rx="10" fill="#eef3df" stroke="#c8d8a7"/>
+  <text x="128" y="348" fill="#202419" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="700">Summarize</text>
+  <rect x="496" y="304" width="368" height="72" rx="10" fill="#eef3df" stroke="#c8d8a7"/>
+  <text x="528" y="348" fill="#202419" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="700">Build Context</text>
+  <rect x="96" y="400" width="768" height="104" rx="10" fill="#ffffff" stroke="#d8cfbd"/>
+  <text x="128" y="438" fill="#202419" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">Current Page</text>
+  <text x="128" y="470" fill="#58604b" font-family="Inter, Arial, sans-serif" font-size="17">Selection first + readable page context</text>
+  <rect x="96" y="528" width="768" height="28" rx="14" fill="#dfe8c8"/>
+  <text x="128" y="548" fill="#475235" font-family="Inter, Arial, sans-serif" font-size="15">Latest handoff ready for ChatGPT, Claude, Gemini, or an allowed host</text>
+</svg>

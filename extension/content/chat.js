@@ -1,6 +1,11 @@
 (function () {
   'use strict';
 
+  if (window.__hermesChatBridgeInstalled) {
+    return;
+  }
+  window.__hermesChatBridgeInstalled = true;
+
   let toastEl = null;
 
   function showToast(message, isError) {

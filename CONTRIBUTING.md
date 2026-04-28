@@ -4,7 +4,7 @@ Thanks for helping with Hermes Relay.
 
 ## Development Flow
 
-1. Load the extension from `extension/`.
+1. Load the extension from `extension/`. This is the only source folder used for development.
 2. Make changes in the unpacked extension files.
 3. Reload Hermes Relay in `chrome://extensions`.
 4. Run:
@@ -23,6 +23,16 @@ npm run setup:local
 - `extension/sidepanel/`: persistent workspace for page-aware flows
 - `extension/content/chat.js`: context injection into supported chat UIs
 - `test/`: Node smoke tests for storage, handoff, Hermes client, and workflow helpers
+
+Generated duplicate extension folders, local Hermes state, and social render artifacts are ignored. Make source changes in `extension/` only.
+
+Public-facing docs live at the repository root:
+
+- `PRIVACY.md`
+- `SECURITY.md`
+- `SUPPORT.md`
+- `CHANGELOG.md`
+- `CHROME_RELEASE.md`
 
 ## Guardrails
 

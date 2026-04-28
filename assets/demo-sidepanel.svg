@@ -1,0 +1,29 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Hermes Relay workspace side panel</title>
+  <desc id="desc">Illustrative side panel workspace with live session status, page continuity, direct thread, notes, and output.</desc>
+  <rect width="960" height="640" rx="28" fill="#2c3322"/>
+  <rect x="70" y="40" width="820" height="560" rx="18" fill="#f6f0e4"/>
+  <rect x="102" y="72" width="756" height="58" rx="10" fill="#303823"/>
+  <text x="128" y="109" fill="#f6f0e4" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Hermes Workspace</text>
+  <rect x="102" y="154" width="756" height="60" rx="10" fill="#edf4dc" stroke="#c8d8a7"/>
+  <text x="128" y="191" fill="#26301d" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Hermes has seen this page before: tracked, watched, has note</text>
+  <rect x="102" y="236" width="360" height="254" rx="10" fill="#ffffff" stroke="#d9d0c1"/>
+  <text x="128" y="272" fill="#202419" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">Direct Line</text>
+  <rect x="128" y="294" width="292" height="54" rx="8" fill="#eef3df"/>
+  <text x="146" y="326" fill="#39442b" font-family="Inter, Arial, sans-serif" font-size="15">What changed since last visit?</text>
+  <rect x="128" y="366" width="292" height="78" rx="8" fill="#f7f2e8"/>
+  <text x="146" y="396" fill="#39442b" font-family="Inter, Arial, sans-serif" font-size="15">Hermes compares snapshots</text>
+  <text x="146" y="420" fill="#39442b" font-family="Inter, Arial, sans-serif" font-size="15">and returns useful deltas.</text>
+  <rect x="496" y="236" width="362" height="254" rx="10" fill="#ffffff" stroke="#d9d0c1"/>
+  <text x="522" y="272" fill="#202419" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">Workspace Output</text>
+  <rect x="522" y="300" width="310" height="26" rx="13" fill="#dfe8c8"/>
+  <rect x="522" y="344" width="258" height="18" rx="9" fill="#e8dfcf"/>
+  <rect x="522" y="378" width="286" height="18" rx="9" fill="#e8dfcf"/>
+  <rect x="522" y="412" width="228" height="18" rx="9" fill="#e8dfcf"/>
+  <rect x="102" y="518" width="232" height="42" rx="8" fill="#303823"/>
+  <text x="134" y="545" fill="#f6f0e4" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Save Snapshot</text>
+  <rect x="364" y="518" width="232" height="42" rx="8" fill="#303823"/>
+  <text x="396" y="545" fill="#f6f0e4" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Build Context</text>
+  <rect x="626" y="518" width="232" height="42" rx="8" fill="#303823"/>
+  <text x="658" y="545" fill="#f6f0e4" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Insert Latest</text>
+</svg>

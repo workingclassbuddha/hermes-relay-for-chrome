@@ -7,14 +7,22 @@ import {
 import {
   canonicalizeUrl,
   normalizeBaseUrl,
+  normalizeAssistantHosts,
   parseIsoTime,
   summarizeNote,
 } from '../shared/utils.js';
 
 function normalizeWorkspaceState(state = {}) {
+  const outputMeta = state?.outputMeta && typeof state.outputMeta === 'object'
+    ? {
+        ...state.outputMeta,
+        provenance: Array.isArray(state.outputMeta.provenance) ? state.outputMeta.provenance : [],
+      }
+    : null;
   return {
     ...DEFAULT_WORKSPACE_STATE,
     ...(state || {}),
+    outputMeta,
   };
 }
 
@@ -83,6 +91,10 @@ function normalizeTrackedPages(items = [], timestamp = '') {
       hostname: item?.hostname || '',
       pageType: item?.pageType || 'page',
       pinned: Boolean(item?.pinned),
+      watchEnabled: Boolean(item?.watchEnabled),
+      watchIntervalMinutes: Number(item?.watchIntervalMinutes || 60),
+      lastWatchAt: item?.lastWatchAt || '',
+      lastWatchStatus: item?.lastWatchStatus || '',
       lastSeenAt: item?.lastSeenAt || item?.createdAt || timestamp,
       lastSnapshotAt: item?.lastSnapshotAt || '',
       createdAt: item?.createdAt || item?.lastSeenAt || timestamp,
@@ -149,8 +161,42 @@ function normalizeRecentActions(items = [], timestamp = '', uuid = () => crypto.
       timestamp: item.timestamp || timestamp,
       summary: item.summary || '',
       output: item.output || '',
+      commandId: item.commandId || item.command_id || '',
+      sessionId: item.sessionId || item.session_id || '',
+      provenance: Array.isArray(item.provenance) ? item.provenance : [],
+      provenanceText: item.provenanceText || '',
+      scope: item.scope || '',
+      scopeLabel: item.scopeLabel || '',
+      destination: item.destination || '',
+      destinationLabel: item.destinationLabel || '',
+      status: item.status || 'done',
+      statusLabel: item.statusLabel || 'Done',
+      modeLabel: item.modeLabel || '',
     }))
     .slice(0, 12);
+}
+
+function normalizeLiveEvents(items = []) {
+  const byKey = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    if (!item) continue;
+    const key = item.id || `${item.session_id || ''}:${item.sequence || ''}`;
+    if (!key) continue;
+    byKey.set(key, {
+      sequence: Number(item.sequence || 0),
+      id: item.id || key,
+      session_id: item.session_id || item.sessionId || '',
+      type: item.type || 'message',
+      created_at: item.created_at || item.timestamp || 0,
+      source: item.source || '',
+      command_id: item.command_id || item.commandId || '',
+      status: item.status || 'ok',
+      payload: item.payload && typeof item.payload === 'object' ? item.payload : {},
+    });
+  }
+  return [...byKey.values()]
+    .sort((left, right) => Number(left.sequence || 0) - Number(right.sequence || 0))
+    .slice(-150);
 }
 
 export function makePageDigest(page) {
@@ -180,6 +226,7 @@ export function migrateStorageRecord(data = {}, {
     conversationPrefix: String(data.conversationPrefix || DEFAULT_CONFIG.conversationPrefix).trim()
       || DEFAULT_CONFIG.conversationPrefix,
     preferredTarget: String(data.preferredTarget || DEFAULT_CONFIG.preferredTarget),
+    customAssistantHosts: normalizeAssistantHosts(data.customAssistantHosts || DEFAULT_CONFIG.customAssistantHosts),
     workspaceState: globalWorkspaceState,
     workspaceStateGlobal: globalWorkspaceState,
     workspaceStateByPage: normalizeWorkspaceStateByPage(data.workspaceStateByPage || {}),
@@ -188,6 +235,7 @@ export function migrateStorageRecord(data = {}, {
     pageNotes: normalizePageNotes(data.pageNotes || {}, timestamp),
     trackedPages: normalizeTrackedPages(data.trackedPages || [], timestamp),
     pageSnapshots: normalizeSnapshots(data.pageSnapshots || []),
+    liveEvents: normalizeLiveEvents(data.liveEvents || []),
   };
 }
 
@@ -221,6 +269,7 @@ export function createStorageApi({
       baseUrl: normalizeBaseUrl(String(data.baseUrl || DEFAULT_CONFIG.baseUrl).trim()),
       conversationPrefix: String(data.conversationPrefix || DEFAULT_CONFIG.conversationPrefix).trim()
         || DEFAULT_CONFIG.conversationPrefix,
+      customAssistantHosts: normalizeAssistantHosts(data.customAssistantHosts || DEFAULT_CONFIG.customAssistantHosts),
     };
   }
 
@@ -235,6 +284,9 @@ export function createStorageApi({
     if ('conversationPrefix' in nextPatch) {
       nextPatch.conversationPrefix = String(nextPatch.conversationPrefix || DEFAULT_CONFIG.conversationPrefix).trim()
         || DEFAULT_CONFIG.conversationPrefix;
+    }
+    if ('customAssistantHosts' in nextPatch) {
+      nextPatch.customAssistantHosts = normalizeAssistantHosts(nextPatch.customAssistantHosts);
     }
 
     await storage.set(nextPatch);
@@ -330,6 +382,60 @@ export function createStorageApi({
     return items.find((item) => item.id === id) || null;
   }
 
+  async function updateRecentActionByCommandId(commandId = '', patch = {}) {
+    const normalizedCommandId = String(commandId || '').trim();
+    if (!normalizedCommandId) {
+      return null;
+    }
+
+    const data = await storage.get({ recentActions: [] });
+    let updated = null;
+    const next = (data.recentActions || []).map((item) => {
+      if (String(item.commandId || item.command_id || '') !== normalizedCommandId) {
+        return item;
+      }
+
+      updated = {
+        ...item,
+        ...patch,
+        commandId: normalizedCommandId,
+        updatedAt: now(),
+      };
+      return updated;
+    });
+
+    if (!updated) {
+      return null;
+    }
+
+    await storage.set({ recentActions: next });
+    return updated;
+  }
+
+  async function getLiveEvents(sessionId = '') {
+    const data = await storage.get({ liveEvents: [] });
+    const items = normalizeLiveEvents(data.liveEvents || []);
+    return sessionId ? items.filter((item) => item.session_id === sessionId) : items;
+  }
+
+  async function pushLiveEvents(events = []) {
+    const data = await storage.get({ liveEvents: [] });
+    const next = normalizeLiveEvents([...(data.liveEvents || []), ...(Array.isArray(events) ? events : [events])]);
+    await storage.set({ liveEvents: next });
+    return next;
+  }
+
+  async function clearLiveEvents(sessionId = '') {
+    if (!sessionId) {
+      await storage.set({ liveEvents: [] });
+      return [];
+    }
+    const data = await storage.get({ liveEvents: [] });
+    const next = normalizeLiveEvents(data.liveEvents || []).filter((item) => item.session_id !== sessionId);
+    await storage.set({ liveEvents: next });
+    return next;
+  }
+
   async function getPageNotes() {
     const data = await storage.get({ pageNotes: {} });
     return data.pageNotes;
@@ -377,6 +483,10 @@ export function createStorageApi({
       hostname: page.hostname || existing?.hostname || '',
       pageType: page.pageType || existing?.pageType || 'page',
       pinned: pin ?? existing?.pinned ?? true,
+      watchEnabled: Boolean(existing?.watchEnabled),
+      watchIntervalMinutes: Number(existing?.watchIntervalMinutes || 60),
+      lastWatchAt: existing?.lastWatchAt || '',
+      lastWatchStatus: existing?.lastWatchStatus || '',
       lastSeenAt: timestamp,
       lastSnapshotAt: existing?.lastSnapshotAt || '',
       createdAt: existing?.createdAt || timestamp,
@@ -527,6 +637,10 @@ export function createStorageApi({
     pushRecent,
     getRecentActions,
     getRecentAction,
+    updateRecentActionByCommandId,
+    getLiveEvents,
+    pushLiveEvents,
+    clearLiveEvents,
     getPageNotes,
     getPageNote,
     savePageNote,

@@ -5,3 +5,6 @@ build/
 coverage/
 *.log
 extension/local-dev-config.json
+hermes-relay-extension/
+.hermes/
+assets/x-update-social*

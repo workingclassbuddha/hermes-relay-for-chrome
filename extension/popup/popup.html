@@ -36,6 +36,11 @@
             <div id="status-meta" class="status-meta">Looking for Hermes on your machine</div>
           </div>
         </div>
+        <div id="live-session-card" class="live-session-card detached">
+          <div id="live-session-label" class="live-session-label">Standalone relay mode</div>
+          <div id="live-session-detail" class="live-session-detail">No live terminal session attached yet.</div>
+          <div id="live-session-activity" class="live-session-activity">No shared live activity yet.</div>
+        </div>
       </section>
 
       <section class="panel">
@@ -97,6 +102,18 @@
         <pre id="setup-command" class="setup-command">Looking for a local Hermes server...</pre>
       </section>
 
+      <section class="panel safety-panel">
+        <div class="panel-head">
+          <h2>Privacy &amp; Safety</h2>
+        </div>
+        <div class="safety-grid">
+          <div class="safety-item">Page data is redacted before it is sent, and only when you click an action or create a watcher.</div>
+          <div class="safety-item">Browser actions require approval in the workspace before Hermes can click, fill, or open pages.</div>
+          <div class="safety-item">Memory actions return a receipt and should never silently store page content.</div>
+          <div class="safety-item">AI-site insertion uses explicit site permission and your active browser session.</div>
+        </div>
+      </section>
+
       <section class="panel">
         <div class="panel-head">
           <h2>Current Page</h2>
@@ -104,6 +121,10 @@
         <div id="page-title" class="recent-title">Loading page…</div>
         <div id="page-meta" class="recent-meta">Looking at the active tab</div>
         <div id="page-continuity" class="continuity-banner new">Checking whether Hermes has seen this page before…</div>
+        <div id="page-scope-card" class="scope-card">
+          <div id="page-scope-label" class="scope-label">Readable page</div>
+          <div id="page-scope-detail" class="scope-detail">Quick actions use redacted readable page context and metadata.</div>
+        </div>
       </section>
 
       <section class="panel">
@@ -111,14 +132,17 @@
           <h2>Quick Actions</h2>
         </div>
         <label class="field">
-          <span>Optional prompt</span>
+          <span>Optional instruction</span>
           <textarea id="ask-prompt" rows="3" placeholder="What matters here? What changed? What should I do next?"></textarea>
         </label>
         <div class="button-grid compact-grid">
-          <button id="summarize-page" class="primary-btn">Summarize Page</button>
+          <button id="explain-selection" class="primary-btn">Explain Selection</button>
+          <button id="summarize-page" class="secondary-btn">Summarize Page</button>
+          <button id="extract-facts" class="secondary-btn">Extract Facts</button>
           <button id="ask-page" class="secondary-btn">Ask Hermes</button>
           <button id="build-context" class="secondary-btn">Build Context</button>
           <button id="insert-latest" class="secondary-btn">Insert Latest</button>
+          <button id="allow-current-host" class="ghost-btn wide" hidden>Allow This AI Site</button>
           <button id="open-workspace-cta" class="ghost-btn wide">Open Full Workspace</button>
         </div>
         <div id="handoff-status" class="microcopy handoff-status">No saved handoff context yet.</div>
@@ -131,9 +155,30 @@
             <button id="copy-output" class="ghost-btn">Copy</button>
           </div>
         </div>
+        <div id="result-meta-card" class="result-meta-card empty">
+          <div class="result-meta-grid">
+            <div class="result-meta-row">
+              <span class="result-meta-key">Mode</span>
+              <span id="result-mode" class="result-meta-value">No run yet</span>
+            </div>
+            <div class="result-meta-row">
+              <span class="result-meta-key">Scope</span>
+              <span id="result-scope" class="result-meta-value">Readable page</span>
+            </div>
+            <div class="result-meta-row">
+              <span class="result-meta-key">Destination</span>
+              <span id="result-destination" class="result-meta-value">Popup and workspace</span>
+            </div>
+            <div class="result-meta-row">
+              <span class="result-meta-key">Status</span>
+              <span id="result-status" class="result-meta-value">Idle</span>
+            </div>
+          </div>
+          <div id="result-provenance" class="result-provenance">Run a quick action to see exactly what Hermes used.</div>
+        </div>
         <pre id="output" class="output">Hermes responses will appear here.</pre>
       </section>
     </main>
-    <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>

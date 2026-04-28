@@ -3,6 +3,8 @@ import { LATEST_CONTEXT_ACTION_TYPES } from '../shared/constants.js';
 export function findLatestContextAction(items = []) {
   return items.find((item) => (
     LATEST_CONTEXT_ACTION_TYPES.includes(item?.type) &&
+    item?.status !== 'queued' &&
+    item?.status !== 'failed' &&
     String(item?.output || '').trim()
   )) || null;
 }

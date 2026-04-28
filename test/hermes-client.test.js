@@ -137,6 +137,138 @@ test('preflightAccess falls back to /v1/responses when /v1/models is unavailable
   ]);
 });
 
+test('getCurrentLiveSession returns attached session metadata when available', async () => {
+  const client = createHermesClient({
+    fetchImpl: async () => ({
+      ok: true,
+      async json() {
+        return {
+          session: {
+            session_id: 'sess_live',
+            session_title: 'Live Session',
+          },
+        };
+      },
+    }),
+  });
+
+  const status = await client.getCurrentLiveSession({
+    baseUrl: 'http://127.0.0.1:8642',
+    apiKey: 'local-key',
+  });
+
+  assert.equal(status.ok, true);
+  assert.equal(status.session.session_id, 'sess_live');
+});
+
+test('sendLiveCommand returns live session response text', async () => {
+  const seen = [];
+  const client = createHermesClient({
+    fetchImpl: async (url, options) => {
+      seen.push({ url: String(url), options });
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            result: {
+              text: 'Live shared-session reply',
+              session_id: 'sess_live',
+            },
+          };
+        },
+      };
+    },
+  });
+
+  const result = await client.sendLiveCommand({
+    baseUrl: 'http://127.0.0.1:8642',
+    apiKey: 'local-key',
+  }, {
+    sessionId: 'sess_live',
+    type: 'workflow.run',
+    prompt: 'Summarize this page',
+    metadata: { mode: 'summarize' },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.text, 'Live shared-session reply');
+  assert.match(seen[0].url, /\/v1\/live-sessions\/sess_live\/commands$/);
+});
+
+test('sendLiveCommand returns queued command metadata for accepted live commands', async () => {
+  const client = createHermesClient({
+    fetchImpl: async () => ({
+      ok: false,
+      status: 202,
+      async json() {
+        return {
+          command: {
+            command_id: 'cmd_queued',
+            session_id: 'sess_live',
+          },
+        };
+      },
+    }),
+  });
+
+  const result = await client.sendLiveCommand({
+    baseUrl: 'http://127.0.0.1:8642',
+    apiKey: 'local-key',
+  }, {
+    sessionId: 'sess_live',
+    type: 'workflow.run',
+    prompt: 'Summarize this page',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.queued, true);
+  assert.equal(result.text, '');
+  assert.equal(result.sessionId, 'sess_live');
+  assert.equal(result.commandId, 'cmd_queued');
+});
+
+test('buildLiveEventsUrl authenticates EventSource streams with a query token', () => {
+  const client = createHermesClient();
+  const url = client.buildLiveEventsUrl({
+    baseUrl: 'http://127.0.0.1:8642',
+    apiKey: 'local-key',
+  }, {
+    sessionId: 'sess_live',
+    after: 12,
+  });
+
+  assert.equal(url, 'http://127.0.0.1:8642/v1/live-sessions/sess_live/events?access_token=local-key&after=12');
+});
+
+test('postLiveBrowserEvent sends browser context events to the live session API', async () => {
+  const seen = [];
+  const client = createHermesClient({
+    fetchImpl: async (url, options) => {
+      seen.push({ url: String(url), body: JSON.parse(options.body) });
+      return {
+        ok: true,
+        async json() {
+          return { ok: true, event: { type: 'browser.context' } };
+        },
+      };
+    },
+  });
+
+  const result = await client.postLiveBrowserEvent({
+    baseUrl: 'http://127.0.0.1:8642',
+    apiKey: 'local-key',
+  }, {
+    sessionId: 'sess_live',
+    type: 'browser.context',
+    payload: { page: { url: 'https://example.com' } },
+  });
+
+  assert.equal(result.ok, true);
+  assert.match(seen[0].url, /\/v1\/live-sessions\/sess_live\/browser-events$/);
+  assert.equal(seen[0].body.type, 'browser.context');
+});
+
 test('callResponse returns parsed output text', async () => {
   const client = createHermesClient({
     fetchImpl: async () => ({

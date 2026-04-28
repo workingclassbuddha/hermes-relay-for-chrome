@@ -12,7 +12,8 @@
     "scripting",
     "tabs",
     "contextMenus",
-    "sidePanel"
+    "sidePanel",
+    "alarms"
   ],
   "commands": {
     "capture-page": {
@@ -41,6 +42,10 @@
     "https://chatgpt.com/*",
     "https://chat.openai.com/*",
     "https://gemini.google.com/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
   ],
   "background": {
     "service_worker": "background.js",

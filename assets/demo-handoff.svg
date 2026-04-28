@@ -1,0 +1,29 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Hermes Relay AI handoff flow</title>
+  <desc id="desc">Illustrative flow showing a browser page going to Hermes Relay, then into Hermes Agent, then into another assistant.</desc>
+  <rect width="960" height="640" rx="28" fill="#1f2318"/>
+  <rect x="68" y="170" width="210" height="240" rx="16" fill="#f6f0e4"/>
+  <text x="100" y="218" fill="#202419" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">Web Page</text>
+  <rect x="100" y="250" width="142" height="16" rx="8" fill="#d8cfbd"/>
+  <rect x="100" y="286" width="116" height="16" rx="8" fill="#d8cfbd"/>
+  <rect x="100" y="322" width="150" height="16" rx="8" fill="#d8cfbd"/>
+  <text x="96" y="382" fill="#58604b" font-family="Inter, Arial, sans-serif" font-size="15">redacted context</text>
+  <path d="M300 290H394" stroke="#c6d79a" stroke-width="8" stroke-linecap="round"/>
+  <path d="M374 266L402 290L374 314" stroke="#c6d79a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="414" y="144" width="240" height="292" rx="18" fill="#303823"/>
+  <text x="450" y="198" fill="#f6f0e4" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Hermes Relay</text>
+  <rect x="450" y="236" width="168" height="36" rx="18" fill="#dfe8c8"/>
+  <text x="474" y="260" fill="#303823" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700">Build Context</text>
+  <rect x="450" y="298" width="168" height="36" rx="18" fill="#dfe8c8"/>
+  <text x="474" y="322" fill="#303823" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700">Save Continuity</text>
+  <rect x="450" y="360" width="168" height="36" rx="18" fill="#dfe8c8"/>
+  <text x="474" y="384" fill="#303823" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700">Insert Latest</text>
+  <path d="M676 290H770" stroke="#c6d79a" stroke-width="8" stroke-linecap="round"/>
+  <path d="M750 266L778 290L750 314" stroke="#c6d79a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="798" y="170" width="94" height="240" rx="16" fill="#f6f0e4"/>
+  <text x="820" y="218" fill="#202419" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">AI</text>
+  <text x="815" y="248" fill="#202419" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">Chat</text>
+  <rect x="822" y="292" width="44" height="44" rx="10" fill="#dfe8c8"/>
+  <text x="810" y="382" fill="#58604b" font-family="Inter, Arial, sans-serif" font-size="15">handoff</text>
+  <text x="252" y="502" fill="#f6f0e4" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">Current page to Hermes to another assistant, without losing context.</text>
+</svg>

@@ -4,12 +4,50 @@ import { createStorageApi } from './lib/background/storage.js';
 import { createPageContextApi } from './lib/background/page-context.js';
 import { createHermesClient } from './lib/background/hermes-client.js';
 import { buildLocalDevConfigPatch, loadLocalDevConfig } from './lib/background/local-dev-config.js';
+import { createLiveEventManager } from './lib/background/live.js';
+import { createPageWatcherManager } from './lib/background/watchers.js';
 import { createRelayOperations } from './lib/background/workflows.js';
 
 const storageApi = createStorageApi();
 const pageContextApi = createPageContextApi();
 const hermesClient = createHermesClient();
 const readStoredConfig = storageApi.getConfig.bind(storageApi);
+const permissionsApi = globalThis.chrome?.permissions;
+const WATCH_ALARM_NAME = 'hermes-relay-watch-pages';
+
+function getOriginPattern(url = '') {
+  try {
+    const parsed = new URL(String(url || ''));
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return '';
+    }
+    return `${parsed.protocol}//${parsed.hostname}/*`;
+  } catch (_) {
+    return '';
+  }
+}
+
+async function requestSitePermission(url = '') {
+  const origin = getOriginPattern(url);
+  if (!origin) {
+    throw new Error('Open a normal website tab before allowing it as an AI host.');
+  }
+
+  if (!permissionsApi?.request || !permissionsApi?.contains) {
+    return origin;
+  }
+
+  if (await permissionsApi.contains({ origins: [origin] })) {
+    return origin;
+  }
+
+  const granted = await permissionsApi.request({ origins: [origin] });
+  if (!granted) {
+    throw new Error(`Hermes needs permission for ${origin} before it can route into this site.`);
+  }
+
+  return origin;
+}
 
 async function syncLocalDevConfig() {
   const [config, localDevConfig] = await Promise.all([
@@ -95,6 +133,20 @@ const operations = createRelayOperations({
   getConfig: async () => (await getRuntimeConfig({ ensureReachable: true })).config,
 });
 
+const liveEvents = createLiveEventManager({
+  storageApi,
+  hermesClient,
+  runtime: chrome.runtime,
+});
+
+const pageWatchers = createPageWatcherManager({
+  storageApi,
+  pageContextApi,
+  alarms: chrome.alarms,
+  tabs: chrome.tabs,
+  alarmName: WATCH_ALARM_NAME,
+});
+
 function contextMenuCreate(menu) {
   return new Promise((resolve, reject) => {
     chrome.contextMenus.create(menu, () => {
@@ -146,6 +198,7 @@ async function initializeRelay() {
   await storageApi.ensureStorageSchema();
   await syncLocalDevConfig();
   await ensureContextMenus();
+  await pageWatchers.ensureAlarm();
 }
 
 let ready = Promise.resolve();
@@ -207,10 +260,19 @@ async function messageGetStatus() {
   const { config, health, localDevConfig } = await getRuntimeConfig({
     ensureReachable: true,
   });
-  const preflight = await getAuthenticatedPreflight(config, health);
+  const [preflight, liveSession] = await Promise.all([
+    getAuthenticatedPreflight(config, health),
+    hermesClient.getCurrentLiveSession(config),
+  ]);
+  await liveEvents.ensureStream(config, liveSession);
+  const liveTimelineEvents = liveSession?.session?.session_id
+    ? await storageApi.getLiveEvents(liveSession.session.session_id)
+    : [];
   return {
     health,
     preflight,
+    liveSession,
+    liveTimeline: liveEvents.summarize(liveTimelineEvents),
     config,
     localDevConfig: localDevConfig ? {
       source: localDevConfig.source,
@@ -254,6 +316,8 @@ async function messageGetHandoffStatus() {
       type: status.type,
       canInsertHere: status.canInsertHere,
       activeTarget: status.activeTarget,
+      activeHostname: status.activeHostname,
+      canAllowCurrentHost: status.canAllowCurrentHost,
     },
   };
 }
@@ -323,6 +387,127 @@ const messageHandlers = {
     };
   },
 
+  async GET_LIVE_TIMELINE(message) {
+    const { config } = await getRuntimeConfig({ ensureReachable: true });
+    const streamState = liveEvents.getState();
+    const sessionId = message.sessionId || streamState.sessionId || '';
+    const events = await storageApi.getLiveEvents(sessionId);
+    return {
+      ok: true,
+      stream: {
+        sessionId,
+        status: streamState.status,
+        error: streamState.error,
+      },
+      summary: liveEvents.summarize(events),
+      events,
+      config: {
+        baseUrl: config.baseUrl,
+      },
+    };
+  },
+
+  async POST_BROWSER_CONTEXT_EVENT(message) {
+    const { config } = await getRuntimeConfig({ ensureReachable: true });
+    const liveSession = await hermesClient.getCurrentLiveSession(config);
+    const sessionId = message.sessionId || liveSession?.session?.session_id || '';
+    if (!sessionId) {
+      throw new Error('No live Hermes session is attached.');
+    }
+    const current = await operations.getCurrentPageContext(message.page || null, null);
+    if (!current.page) {
+      throw new Error('No active page available.');
+    }
+    const posted = await hermesClient.postLiveBrowserEvent(config, {
+      sessionId,
+      type: 'browser.context',
+      payload: {
+        source: message.source || 'extension',
+        page: current.page,
+      },
+    });
+    if (posted?.event) {
+      await storageApi.pushLiveEvents([posted.event]);
+    }
+    return {
+      ok: true,
+      event: posted.event,
+      page: current.page,
+    };
+  },
+
+  async RESOLVE_LIVE_APPROVAL(message) {
+    const { config } = await getRuntimeConfig({ ensureReachable: true });
+    const sessionId = message.sessionId || liveEvents.getState().sessionId || '';
+    const approvalId = message.approvalId || message.approval_id || '';
+    const decision = message.decision === 'approved' ? 'approved' : 'denied';
+    const action = message.action && typeof message.action === 'object' ? message.action : {};
+    let actionResult = null;
+
+    if (!sessionId || !approvalId) {
+      throw new Error('Missing live session or approval ID.');
+    }
+
+    if (decision === 'approved') {
+      try {
+        const activeTab = await pageContextApi.getActiveTab();
+        if (!activeTab?.id) {
+          throw new Error('No active tab available for the approved browser action.');
+        }
+        actionResult = await pageContextApi.executeApprovedBrowserAction(activeTab.id, action);
+        const posted = await hermesClient.postLiveBrowserResult(config, {
+          sessionId,
+          status: 'ok',
+          commandId: message.commandId || '',
+          payload: {
+            approval_id: approvalId,
+            action,
+            result: actionResult,
+          },
+        });
+        if (posted?.event) {
+          await storageApi.pushLiveEvents([posted.event]);
+        }
+      } catch (error) {
+        actionResult = {
+          ok: false,
+          error: error.message || String(error),
+        };
+        const posted = await hermesClient.postLiveBrowserResult(config, {
+          sessionId,
+          status: 'failed',
+          commandId: message.commandId || '',
+          payload: {
+            approval_id: approvalId,
+            action,
+            result: actionResult,
+          },
+        });
+        if (posted?.event) {
+          await storageApi.pushLiveEvents([posted.event]);
+        }
+      }
+    }
+
+    const resolved = await hermesClient.resolveLiveApproval(config, {
+      sessionId,
+      approvalId,
+      decision,
+      payload: {
+        action,
+        result: actionResult,
+      },
+    });
+    if (resolved?.approval) {
+      chrome.runtime.sendMessage({ type: 'LIVE_APPROVAL_RESOLVED', approval: resolved.approval }).catch(() => {});
+    }
+    return {
+      ok: true,
+      approval: resolved.approval,
+      result: actionResult,
+    };
+  },
+
   async GET_RECENT_DETAIL(message) {
     const item = await storageApi.getRecentAction(message.id);
     return { ok: !!item, item };
@@ -359,6 +544,34 @@ const messageHandlers = {
     return {
       ok: true,
       tracked: await storageApi.upsertTrackedPage(await requirePage(message.page || null), message.pinned !== false),
+    };
+  },
+
+  async WATCH_PAGE(message) {
+    const page = message.page?.url ? message.page : await requirePage(message.page || null);
+    const tracked = await storageApi.upsertTrackedPage(page, true);
+    const updated = await storageApi.updateTrackedPage(tracked.url, {
+      watchEnabled: true,
+      watchIntervalMinutes: Math.max(15, Number(message.intervalMinutes || 60)),
+      lastWatchStatus: 'watching',
+    });
+    await pageWatchers.ensureAlarm();
+    return {
+      ok: true,
+      tracked: updated,
+    };
+  },
+
+  async UNWATCH_PAGE(message) {
+    const url = message.url || message.page?.url || '';
+    const updated = await storageApi.updateTrackedPage(url, {
+      watchEnabled: false,
+      lastWatchStatus: 'paused',
+    });
+    await pageWatchers.ensureAlarm();
+    return {
+      ok: true,
+      tracked: updated,
     };
   },
 
@@ -430,6 +643,15 @@ const messageHandlers = {
     return {
       ok: true,
       ...(await operations.insertLatestContext()),
+    };
+  },
+
+  async ALLOW_CURRENT_AI_HOST() {
+    const activeTab = await pageContextApi.getActiveTab();
+    await requestSitePermission(activeTab?.url || '');
+    return {
+      ok: true,
+      ...(await operations.addCustomAssistantHost(activeTab?.url || '')),
     };
   },
 
@@ -573,6 +795,15 @@ chrome.commands.onCommand.addListener(async (command) => {
     }, { useActivePage: true });
   }
 });
+
+if (chrome.alarms?.onAlarm) {
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name !== WATCH_ALARM_NAME) return;
+    pageWatchers.run().catch((error) => {
+      console.error('Hermes Relay watcher failed.', error);
+    });
+  });
+}
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {

@@ -4,6 +4,7 @@ export const DEFAULT_CONFIG = {
   model: 'hermes-agent',
   conversationPrefix: 'hermes-relay',
   preferredTarget: 'auto',
+  customAssistantHosts: [],
 };
 
 export const LOCAL_HERMES_BASE_URLS = [
@@ -28,6 +29,7 @@ export const DEFAULT_WORKSPACE_STATE = {
   mode: 'ask',
   target: 'auto',
   output: '',
+  outputMeta: null,
   lastAction: '',
   pageLock: false,
   lockedPageUrl: '',

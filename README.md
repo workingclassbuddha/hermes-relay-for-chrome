@@ -4,182 +4,106 @@
   <img src="./assets/readme-hero.svg" alt="Hermes Relay hero banner" width="100%" />
 </p>
 
-> The browser extension for [Hermes Agent](https://hermes-agent.nousresearch.com/) by Nous Research. Hermes Relay gives Hermes a direct line into the browser for page context, revisit continuity, tracked pages, and AI handoff.
+Hermes Relay for Chrome gives local **Hermes Agent** browser context, revisit continuity, and AI handoff.
 
-Hermes Relay turns the browser into a working surface for Hermes Agent.
-It lets Hermes understand the page you are on, remember what mattered there, return with continuity later, and hand off clean context bundles into assistants like Claude, ChatGPT, and Gemini.
+It is a Chrome Manifest V3 extension for people who want Hermes to understand the page they are reading, keep useful continuity around important pages, and move compact context bundles into assistants like Claude, ChatGPT, and Gemini.
 
----
+> Hermes Relay is an independent browser companion for [Hermes Agent](https://hermes-agent.nousresearch.com/) by Nous Research. It talks to your local Hermes API server; this repository does not include a hosted backend.
 
-## Why Hermes Relay
+## What It Does
 
-[Hermes Agent](https://hermes-agent.nousresearch.com/) is built to live on your machine, remember what it learns, and grow more capable over time.
-Hermes Relay is the browser companion for that agent, so you can:
+- captures redacted context from the current browser page
+- runs page-aware Hermes workflows such as Ask, Summarize, Next Steps, Extract Tasks, Research, Compare, and Build Context
+- saves page notes, snapshots, tracked-page state, direct threads, and recent workspace output in Chrome local storage
+- helps Hermes recognize pages you revisit
+- builds compact handoff bundles for other AI assistants
+- inserts the latest handoff context into Claude, ChatGPT, Gemini, or a custom AI host you explicitly allow
+- optionally shares browser context with an attached live Hermes terminal session
 
-- ask Hermes about the page you are reading right now
-- keep continuity on important pages with notes, pins, tracked pages, and snapshots
-- revisit a page and understand what changed since the last time Hermes saw it
-- save durable facts, preferences, and workflows into Hermes memory
-- turn page context into summaries, action plans, replies, and task lists
-- build compact context bundles for other AI assistants
-- inject those bundles directly into supported chat inputs
+## Who It Is For
 
----
+Hermes Relay is currently best for:
 
-## Product Shape
+- Hermes Agent users running the local API server
+- people testing browser continuity and local-first agent workflows
+- Hermes Agent maintainers reviewing browser integration ideas
+- early contributors who are comfortable loading an unpacked Chrome extension
 
-```mermaid
-flowchart LR
-  A[Open any page] --> B[Hermes sees page context]
-  B --> C[Run Hermes workflow]
-  C --> D[Save memory, notes, snapshots, or tracked-page state]
-  D --> E[Revisit with continuity]
-  E --> F[Inject into Claude, ChatGPT, or Gemini]
-```
-
----
-
-## Highlights
-
-### Popup
-
-The popup is now a fast launcher instead of a mini workspace:
-
-- local Hermes connection flow
-- current-page continuity check so you can tell whether Hermes has seen this page before
-- one-field quick prompt
-- fast actions for summarizing the page, asking Hermes, building context, and jumping into the full workspace
-- latest workspace output preview
-
-### Workspace side panel
-
-The side panel is the primary workspace for ongoing page work:
-
-- current-page context view
-- continuity banner for pages Hermes has already seen
-- page notes
-- page snapshots and snapshot comparison
-- direct line thread for page-aware conversation
-- workflow runner for page-aware Hermes actions
-- memory actions
-- tracked-page review with search and pinning
-- workspace history
-
-### Browser integration
-
-Hermes Relay also hooks into the browser directly:
-
-- context menus for selection and page actions
-- keyboard shortcuts for capture and context workflows
-- chat input injection on:
-  - `claude.ai`
-  - `chatgpt.com`
-  - `chat.openai.com`
-  - `gemini.google.com`
-
----
-
-## Supported workflows
-
-| Workflow | What it does |
-| --- | --- |
-| Ask | Explain what matters on the current page |
-| Summarize | Produce a high-signal summary |
-| Next Steps | Turn page context into an action plan |
-| Draft Reply | Draft a response based on the page |
-| Extract Tasks | Pull out tasks, decisions, blockers, and open questions |
-| Research | Turn the page into a compact research brief |
-| Compare | Compare options or claims on the page |
-| Capture | Save the page as a useful Hermes retrieval artifact |
-| Memory Actions | Persist facts, preferences, or workflows when durable |
-| Build Context | Create a compact bundle for another assistant |
-| Inject Context | Insert the latest Hermes context into a supported chat input |
-
----
+This is not yet a Chrome Web Store release. The intended public launch path is a GitHub release with source install instructions and a packaged zip.
 
 ## Requirements
 
-Before using Hermes Relay, make sure you have:
+- Chrome 114 or newer
+- local Hermes Agent installation
+- Hermes API server enabled
+- local Hermes API key
+- Node.js and npm for setup, tests, and packaging
 
-- Chrome **114+**
-- a local Hermes Agent installation
-- the Hermes API server enabled
-- a local Hermes API key
+Hermes Relay expects the local API to be available at:
 
----
+```text
+http://127.0.0.1:8642
+```
 
-## Hermes setup
+It also probes:
 
-Hermes Relay for Chrome expects the official Hermes Agent API server to be running locally.
+```text
+http://localhost:8642
+```
 
-Add the following to `~/.hermes/.env`:
+## Install From Source
+
+1. Clone this repository.
+2. Open `chrome://extensions`.
+3. Enable **Developer mode**.
+4. Click **Load unpacked**.
+5. Select the `extension/` folder only.
+6. Pin Hermes Relay if you want quick popup access.
+
+Do not load generated or copied extension folders during development. The canonical source folder is `extension/`.
+
+## Local Hermes Setup
+
+Add this to `~/.hermes/.env`:
 
 ```bash
 API_SERVER_ENABLED=true
 API_SERVER_KEY=change-me-local-dev
 ```
 
-Then start Hermes:
+Start Hermes:
 
 ```bash
 hermes gateway
 ```
 
-Default local API:
-
-```text
-http://127.0.0.1:8642
-```
-
-From this repo, you can also run:
+Then from this repository run:
 
 ```bash
 npm run setup:local
 ```
 
-That local helper checks `~/.hermes/.env`, probes the common local Hermes API URLs, and prints the exact extension and zip paths you can load in Chrome.
-When it finds `API_SERVER_KEY`, it also writes a local ignored `extension/local-dev-config.json` file so the unpacked extension can auto-connect after you reload it in `chrome://extensions`. The packaged zip excludes that file.
+The setup helper checks common local Hermes API URLs, reads your local API key when available, and writes an ignored development config at `extension/local-dev-config.json`. The packaged zip excludes that file.
 
-Official references:
+Reload the unpacked extension in `chrome://extensions` after setup.
+
+Official Hermes references:
 
 - [Hermes Agent](https://hermes-agent.nousresearch.com/)
 - [Hermes Agent docs](https://hermes-agent.nousresearch.com/docs/)
 - [API Server docs](https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server/)
 - [Memory docs](https://hermes-agent.nousresearch.com/docs/user-guide/features/memory/)
 
----
+## Core Workflow
 
-## Quick start
+1. Open an article, app page, issue, pull request, thread, or document.
+2. Open the Hermes Relay popup.
+3. Confirm Hermes is reachable and authenticated.
+4. Run **Summarize**, **Ask**, **Extract Facts**, or **Build Context**.
+5. Open the side panel for notes, snapshots, tracked pages, direct page-aware conversation, and workspace history.
+6. Use **Insert Latest** on Claude, ChatGPT, Gemini, or a user-approved AI host when you want to continue elsewhere.
 
-### 1. Load the extension
-
-1. Open `chrome://extensions`
-2. Enable **Developer mode**
-3. Click **Load unpacked**
-4. Select `hermes-relay/extension`
-
-### 2. Connect Hermes Relay
-
-1. Open the Hermes Relay popup
-2. Run `npm run setup:local`, then reload the unpacked extension in `chrome://extensions`
-3. Open the popup and let it auto-connect to your local Hermes server
-4. If you are not using the local setup helper, paste your local Hermes API key manually
-5. Click **Save & Test** if you changed any settings by hand
-
-### 3. Use it on a page
-
-A good first run looks like this:
-
-1. Open any article, app page, or thread
-2. Follow the popup checklist until all three setup steps are green
-3. Click **Summarize** or **Ask**
-4. Save a note or snapshot if the page matters later
-5. Open the **Workspace** side panel for continuity, notes, snapshots, and memory actions
-6. Use **Build Context** to create a handoff bundle, then **Insert Latest** on Claude, ChatGPT, or Gemini
-
----
-
-## Keyboard shortcuts
+Keyboard shortcuts:
 
 | Shortcut | Action |
 | --- | --- |
@@ -187,22 +111,82 @@ A good first run looks like this:
 | `Alt+Shift+C` | Build Hermes context |
 | `Alt+Shift+I` | Inject latest Hermes context |
 
----
-
-## Context menus
-
-Hermes Relay adds browser context-menu actions for quick, in-page use. Selection and page actions route into the Hermes Workspace side panel by default so your browsing flow stays intact:
+Context menu actions:
 
 - **Explain this selection with Hermes**
 - **Save this selection to Hermes memory**
 - **Open this page in Hermes Workspace**
 - **Insert latest Hermes context here**
 
----
+## Demo Media
 
-## Validate the project
+These launch images show the intended first-run story and product surfaces.
 
-From `hermes-relay/`:
+| Popup | Workspace | Handoff |
+| --- | --- | --- |
+| ![Popup quick actions](./assets/demo-popup.svg) | ![Workspace side panel](./assets/demo-sidepanel.svg) | ![AI handoff flow](./assets/demo-handoff.svg) |
+
+## Architecture
+
+Hermes Relay is split into small extension surfaces:
+
+- `extension/background.js` is the service worker control plane. It initializes storage, context menus, watchers, live events, and message routing.
+- `extension/lib/background/page-context.js` extracts active-page context through `chrome.scripting`.
+- `extension/lib/background/hermes-client.js` talks to the local Hermes API server.
+- `extension/lib/background/workflows.js` builds browser-context envelopes and routes workflows to standalone Hermes responses or live sessions.
+- `extension/lib/background/storage.js` normalizes Chrome local storage for config, notes, snapshots, tracked pages, direct threads, recent actions, live events, and workspace state.
+- `extension/content/chat.js` inserts saved handoff context into supported assistant inputs.
+- `extension/popup/` provides fast setup and quick actions.
+- `extension/sidepanel/` provides the full workspace.
+
+Hermes API assumptions:
+
+- `GET /health` for local server readiness
+- `GET /v1/models` for authenticated preflight when available
+- `POST /v1/responses` for standalone Hermes responses
+- `GET /v1/live-sessions/current` for attached live-session discovery
+- live-session command, event, browser-event, browser-result, and approval endpoints for shared terminal workflows
+
+## Privacy And Security
+
+Hermes Relay is local-first:
+
+- no hosted backend is included in this project
+- local configuration is stored in Chrome extension storage
+- local development config is ignored and excluded from release zips
+- page context is redacted before it is sent to Hermes
+- chat insertion is user-directed
+- custom AI hosts require explicit user approval
+
+Read:
+
+- [Privacy](./PRIVACY.md)
+- [Security](./SECURITY.md)
+- [Support](./SUPPORT.md)
+
+## Known Limitations
+
+- Hermes Relay requires a local Hermes Agent API server.
+- Chat input insertion depends on assistant page structure and may need updates when Claude, ChatGPT, Gemini, or custom hosts change their DOM.
+- Live-session and approval flows are early integration surfaces and may change with Hermes Agent.
+- Redaction reduces risk but cannot guarantee that every sensitive value is removed.
+- Chrome internal pages such as `chrome://extensions` cannot be inspected by the extension.
+
+## For Hermes Agent Maintainers
+
+Useful review areas:
+
+- whether the browser-context envelope matches Hermes Agent expectations
+- whether the local API assumptions should be formalized or adjusted
+- whether live-session browser events and approval payloads should use a different shape
+- whether memory actions should return richer receipts
+- whether Hermes should own a first-party browser companion interface long term
+
+The extension intentionally avoids remote hosted logic and keeps browser actions user-directed.
+
+## Validate
+
+Run the full check suite:
 
 ```bash
 npm run check
@@ -210,96 +194,45 @@ npm run check
 
 This validates:
 
-- `extension/manifest.json`
-- `extension/background.js`
-- `extension/content/chat.js`
-- `extension/popup/popup.js`
-- `extension/sidepanel/sidepanel.js`
-- smoke tests under `test/`
+- manifest JSON
+- JavaScript syntax
+- unit tests under `test/*.test.js`
+- fixture e2e coverage under `test/e2e/`
 
----
+## Package A GitHub Release Zip
 
-## Package for Chrome
-
-Build an uploadable Chrome zip from `hermes-relay/`:
+Build the Chrome extension zip:
 
 ```bash
 npm run package:chrome
 ```
 
-This will:
-
-- generate release icons in `extension/icons/`
-- create `dist/hermes-relay-chrome.zip`
-
----
-
-## Positioning
-
-Hermes Relay for Chrome is the browser extension for Hermes Agent by Nous Research.
-It gives Hermes a direct line into the pages you read, revisit, track, and hand off into AI workflows.
-
----
-
-## Project layout
+The uploadable zip is written to:
 
 ```text
-hermes-relay/
-  .gitignore
-  CONTRIBUTING.md
-  LICENSE
-  README.md
-  package.json
-  assets/
-    readme-hero.svg
-  extension/
-    manifest.json
-    background.js
-    lib/
-      background/
-      shared/
-    content/
-      chat.js
-    popup/
-      popup.html
-      popup.css
-      popup.js
-    sidepanel/
-      sidepanel.html
-      sidepanel.css
-      sidepanel.js
-  test/
+dist/hermes-relay-chrome.zip
 ```
 
----
+The package script also generates release PNG icons in `extension/icons/` and excludes local-only config such as `extension/local-dev-config.json`.
 
-## Architecture at a glance
-
-- `background.js` is the extension control plane
-- `content/chat.js` handles chat-input insertion on supported assistant sites
-- `popup/` is the lightweight quick-action surface
-- `sidepanel/` is the richer workspace surface
-- local storage is used for config, recents, notes, tracked pages, and snapshots
-- Hermes Relay talks to the local Hermes API server rather than a remote hosted backend
-
----
-
-## Near-term roadmap
-
-- smarter provider-specific injection behavior
-- better Hermes memory receipts and recall flows
-- richer watchlist review actions
-- packaging, icons, and store-readiness
-
----
+See [Chrome Release](./CHROME_RELEASE.md) for the public-launch checklist.
 
 ## Contributing
 
-Contributions are welcome.
-If you are extending workflows, refining the UI, or improving browser integrations, start by reading [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+Start with [CONTRIBUTING.md](./CONTRIBUTING.md), then run:
 
----
+```bash
+npm run check
+```
+
+Good first areas:
+
+- provider-specific chat insertion hardening
+- better empty and error states
+- watchlist review workflows
+- release packaging and docs
+- Hermes API contract review
 
 ## License
 
-See [`LICENSE`](./LICENSE).
+See [LICENSE](./LICENSE).
