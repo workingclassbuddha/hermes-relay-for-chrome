@@ -9,11 +9,24 @@
   <body>
     <main class="workspace">
       <header class="topbar">
-        <div>
-          <div class="eyebrow">Hermes Agent by Nous Research</div>
-          <h1>Hermes Workspace</h1>
+        <div class="topbar-brand">
+          <div class="topbar-mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none">
+              <path d="M24 6l13 11v14L24 42 11 31V17L24 6Z" stroke="currentColor" stroke-width="2"/>
+              <path d="M24 14v20M15 20h18M18 28h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="eyebrow">Hermes Agent by Nous Research</div>
+            <h1>Hermes Workspace</h1>
+          </div>
         </div>
-        <button id="refresh-page" class="icon-btn" title="Refresh page context">↻</button>
+        <button id="refresh-page" class="icon-btn" title="Refresh page context" aria-label="Refresh page context">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 11a8 8 0 0 0-14.2-5M4 5v5h5"/>
+            <path d="M4 13a8 8 0 0 0 14.2 5M20 19v-5h-5"/>
+          </svg>
+        </button>
       </header>
 
       <div id="workspace-toast" class="workspace-toast" role="status" aria-live="polite" hidden></div>

@@ -18,6 +18,11 @@
         <div>
           <h1>Hermes Relay</h1>
           <p>Browser companion for Hermes Agent by Nous Research.</p>
+          <div class="hero-rail" aria-label="Relay capabilities">
+            <span>Local API</span>
+            <span>Redacted context</span>
+            <span>AI handoff</span>
+          </div>
         </div>
       </header>
 
@@ -26,7 +31,12 @@
           <h2>Hermes</h2>
           <div class="header-actions">
             <button id="open-workspace" class="ghost-btn">Workspace</button>
-            <button id="refresh-status" class="icon-btn" title="Refresh status" aria-label="Refresh status">↻</button>
+            <button id="refresh-status" class="icon-btn" title="Refresh status" aria-label="Refresh status">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 11a8 8 0 0 0-14.2-5M4 5v5h5"/>
+                <path d="M4 13a8 8 0 0 0 14.2 5M20 19v-5h-5"/>
+              </svg>
+            </button>
           </div>
         </div>
         <div class="status-row">
